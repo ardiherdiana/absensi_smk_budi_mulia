@@ -1,0 +1,48 @@
+*.log
+.DS_Store
+
+# Semua file .env harus diabaikan - env aktif, backup, per-environment
+# (.env.local, .env.production, .env.testing, dst), maupun hasil dump
+# kredensial lain. Hanya .env.example (isinya cuma placeholder) yang
+# boleh masuk git.
+.env
+.env.*
+!.env.example
+
+.phpactor.json
+.phpunit.cache
+.phpunit.result.cache
+/.codex
+/.cursor/
+/.idea
+/.nova
+/.vscode
+/.zed
+/auth.json
+/coverage
+/node_modules
+/public/build
+/public/fonts-manifest.dev.json
+/public/hot
+/public/storage
+/storage/*.key
+/storage/pail
+/vendor
+
+# Database SQLite lokal (dipakai phpunit/testing) - bisa berisi data
+# hasil sinkron/seed nyata, jangan pernah ikut commit.
+*.sqlite
+*.sqlite-journal
+
+# Dump database production asli yang dipakai ProductionSyncSeeder -
+# berisi data nama/no hp/hash password sungguhan, jangan pernah commit.
+/database/seeders/data/production.sql
+
+# Setting lokal Claude Code (bisa berisi override permission/token MCP
+# yang sifatnya personal per-mesin).
+/.claude/settings.local.json
+
+_ide_helper.php
+Homestead.json
+Homestead.yaml
+Thumbs.db
