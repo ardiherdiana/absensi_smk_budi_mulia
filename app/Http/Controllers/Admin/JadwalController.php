@@ -6,9 +6,6 @@ use App\Http\Controllers\Controller;
 use App\Services\JadwalService;
 use Illuminate\Http\Request;
 
-// Mirrors backend/src/modules/jadwal/jadwal.routes.ts. Stays a plain JSON
-// endpoint (not an Inertia visit) - the page saves one day-column at a time
-// and merges the response into that column's own local state.
 class JadwalController extends Controller
 {
     public function __construct(private JadwalService $jadwal) {}

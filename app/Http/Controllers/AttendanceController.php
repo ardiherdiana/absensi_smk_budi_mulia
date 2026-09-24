@@ -8,9 +8,6 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Inertia\Inertia;
 
-// Mirrors backend/src/modules/attendance/attendance.routes.ts (the
-// guru-self-service + shared endpoints; admin/kepsek oversight endpoints
-// live in Admin\RekapController and Admin\GuruController::detail).
 class AttendanceController extends Controller
 {
     public function __construct(private AttendanceService $attendance) {}

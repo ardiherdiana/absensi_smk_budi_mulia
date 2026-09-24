@@ -11,7 +11,6 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Inertia\Inertia;
 
-// Mirrors backend/src/modules/attendance/attendance.routes.ts's rekap/export/manual endpoints.
 class RekapController extends Controller
 {
     public function __construct(
@@ -52,6 +51,7 @@ class RekapController extends Controller
             $r['jamMasuk'] ? Carbon::parse($r['jamMasuk'])->format('H:i') : '',
             $r['jamPulang'] ? Carbon::parse($r['jamPulang'])->format('H:i') : '',
             $r['status'] ?? '',
+            $r['catatan'] ?? '',
         ])->all();
 
         $from = Carbon::parse($validated['from']);
@@ -65,8 +65,9 @@ class RekapController extends Controller
             schoolName: $this->settings->getSettings()->namaSekolah,
             title: 'Rekap Absensi Guru',
             period: $period,
-            headers: ['Nama', 'Tanggal', 'Jam Masuk', 'Jam Pulang', 'Status'],
+            headers: ['Nama', 'Tanggal', 'Jam Masuk', 'Jam Pulang', 'Status', 'Catatan'],
             rows: $body,
+            statusColumnIndex: 4,
         );
     }
 
@@ -76,6 +77,8 @@ class RekapController extends Controller
             'guruId' => ['required', 'string'],
             'tanggal' => ['required', 'string'],
             'status' => ['required', 'in:HADIR,TELAT,IZIN,SAKIT,ALPA'],
+            'jamMasuk' => ['nullable', 'date_format:H:i'],
+            'jamPulang' => ['nullable', 'date_format:H:i'],
             'catatan' => ['nullable', 'string'],
         ]);
 
@@ -83,6 +86,8 @@ class RekapController extends Controller
             $validated['guruId'],
             Carbon::parse($validated['tanggal']),
             $validated['status'],
+            $validated['jamMasuk'] ?? null,
+            $validated['jamPulang'] ?? null,
             $validated['catatan'] ?? null,
         );
 

@@ -2,9 +2,6 @@
 
 namespace App\Support;
 
-// Mirrors backend/src/utils/geofence.ts exactly - same school coordinates
-// (SMP/SMA/SMK Budi Mulia Telukjambe, from the Google Maps link) and the
-// same Haversine formula.
 class Geofence
 {
     const SCHOOL_LAT = -6.3370648;

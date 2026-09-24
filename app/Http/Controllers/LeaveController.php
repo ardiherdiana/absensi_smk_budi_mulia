@@ -9,7 +9,6 @@ use Illuminate\Support\Carbon;
 use Illuminate\Support\Str;
 use Inertia\Inertia;
 
-// Mirrors backend/src/modules/leave/leave.routes.ts.
 class LeaveController extends Controller
 {
     public function __construct(private LeaveService $leave) {}

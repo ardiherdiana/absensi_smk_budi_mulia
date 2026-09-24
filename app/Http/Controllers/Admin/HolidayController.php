@@ -9,7 +9,6 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Inertia\Inertia;
 
-// Mirrors backend/src/modules/holiday/holiday.routes.ts.
 class HolidayController extends Controller
 {
     public function __construct(private HolidayService $holidays) {}

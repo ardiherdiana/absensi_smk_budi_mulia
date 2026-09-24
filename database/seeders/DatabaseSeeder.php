@@ -7,9 +7,6 @@ use App\Models\User;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\Hash;
 
-// Mirrors js/backend/prisma/seed.ts exactly - same roster, same usernames
-// (precomputed rather than derived at seed time, so re-running stays
-// idempotent instead of drifting to a numbered suffix), same passwords.
 class DatabaseSeeder extends Seeder
 {
     /** @var array<int, array{username: string, nama: string}> */
@@ -41,13 +38,13 @@ class DatabaseSeeder extends Seeder
 
     public function run(): void
     {
+        $this->call(RoleSeeder::class);
+
         User::firstOrCreate(
             ['username' => 'admin'],
             ['password' => Hash::make('admin123'), 'role' => 'ADMIN']
         );
 
-        // Placeholder principal account - rename via Data Guru once the real
-        // Kepala Sekolah's name is known.
         $kepsekUser = User::firstOrCreate(
             ['username' => 'kepsek'],
             ['password' => Hash::make('kepsek123'), 'role' => 'KEPSEK']

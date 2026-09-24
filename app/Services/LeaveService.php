@@ -5,7 +5,6 @@ namespace App\Services;
 use App\Models\LeaveRequest;
 use Illuminate\Support\Carbon;
 
-// Mirrors backend/src/modules/leave/leave.service.ts exactly.
 class LeaveService
 {
     public function __construct(private NotificationService $notifications) {}
@@ -25,9 +24,6 @@ class LeaveService
             'tanggalSelesai' => $selesai,
             'alasan' => $alasan,
             'lampiranUrl' => $lampiranUrl,
-            // Matches the "status" column's DB default explicitly - unlike
-            // Prisma's create(), Eloquent's create() doesn't reload
-            // DB-applied defaults into the returned instance on its own.
             'status' => 'PENDING',
         ]);
         $leave->load('guru:id,nama');
@@ -51,10 +47,6 @@ class LeaveService
 
     public function list(?string $status = null)
     {
-        // guru:id,nama - id is required for Eloquent to match the relation
-        // (Prisma's `select: { nama: true }` doesn't need this), but the
-        // original response only ever exposes {nama} - hide it again after
-        // loading so the JSON shape matches exactly.
         return LeaveRequest::with('guru:id,nama')
             ->when($status, fn ($q) => $q->where('status', $status))
             ->orderByDesc('createdAt')

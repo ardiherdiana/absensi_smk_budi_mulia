@@ -21,11 +21,6 @@ export function AttendanceTrendChart({ data }: { data: TrendPoint[] }) {
   const containerRef = React.useRef<HTMLDivElement>(null)
   const svgRef = React.useRef<SVGSVGElement>(null)
 
-  // The SVG's viewBox width is kept in sync with its actual rendered pixel
-  // width (instead of a fixed value stretched via CSS) so 1 SVG user unit
-  // always equals 1 real pixel - the plot area can then fill any container
-  // width while font-size/stroke-width (defined in those same user units)
-  // never scale up past their intended physical size.
   const [width, setWidth] = React.useState(DEFAULT_WIDTH)
 
   React.useEffect(() => {

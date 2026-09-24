@@ -33,10 +33,6 @@ const Toaster = ({ ...props }: ToasterProps) => {
           "--normal-text": "var(--popover-foreground)",
           "--normal-border": "var(--border)",
           "--border-radius": "var(--radius)",
-          // Full solid per type (green/yellow/red) instead of a pale tint -
-          // a subtle tint of --success/--warning/--destructive read as too
-          // close to the app's own orange primary color, so toasts are kept
-          // fully saturated and unmixed with the brand palette.
           "--success-bg": "var(--success)",
           "--success-text": "var(--success-foreground)",
           "--success-border": "var(--success)",

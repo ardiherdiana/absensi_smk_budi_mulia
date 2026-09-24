@@ -7,9 +7,6 @@ import type { CheckinResult, Settings } from "@/lib/types"
 
 type Status = "idle" | "processing" | "success" | "error"
 
-// How long a success/error result stays on screen before the station resets
-// back to "waiting for scan" - long enough for the guru to read it, short
-// enough that the next person isn't stuck looking at someone else's result.
 const RESULT_RESET_MS = 4000
 
 /** Scan station for the school's USB barcode/QR scanner (a desktop device
@@ -32,9 +29,6 @@ export function KioskPage({ settings }: { settings: Settings }) {
     return () => clearInterval(clockTimer)
   }, [])
 
-  // The scanner device just sends keystrokes to whatever element has focus,
-  // so this input must always stay focused - reclaim it on any stray click
-  // and right after every scan result clears.
   const focusInput = React.useCallback(() => {
     inputRef.current?.focus()
   }, [])
@@ -157,7 +151,7 @@ export function KioskPage({ settings }: { settings: Settings }) {
       </p>
 
       <Link
-        href="/dashboard"
+        href="/menu-utama"
         className="absolute top-4 left-4 flex items-center gap-1.5 text-sm text-white/70 hover:text-white"
       >
         <ArrowLeft className="size-4" />

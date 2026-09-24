@@ -6,7 +6,6 @@ use App\Models\Guru;
 use App\Models\User;
 use Illuminate\Support\Facades\Hash;
 
-// Mirrors backend/src/modules/guru/guru.service.ts exactly.
 class GuruService
 {
     /** Username is auto-derived from the teacher's own name (first two
@@ -94,9 +93,6 @@ class GuruService
             'noHp' => $input['noHp'] ?? null,
             'mapel' => $input['mapel'] ?? null,
             'fotoUrl' => $input['fotoUrl'] ?? null,
-            // Matches the "aktif" column's DB default (true) explicitly -
-            // unlike Prisma's create(), Eloquent's create() doesn't reload
-            // DB-applied defaults into the returned instance on its own.
             'aktif' => true,
         ])->load('user:id,username,role');
 
@@ -134,7 +130,7 @@ class GuruService
         if (! $guru) {
             abort(404, 'Guru tidak ditemukan');
         }
-        $guru->user->delete(); // cascades to guru via FK onDelete cascade
+        $guru->user->delete();
     }
 
     /** Issues a fresh static QR token for a guru, invalidating whatever QR

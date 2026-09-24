@@ -54,6 +54,11 @@ cp .env.example .env
 php artisan key:generate
 ```
 
+> **Database ini dipakai bersama dengan project `sppd`** (satu MySQL database, dua aplikasi
+> Laravel terpisah) — lihat bagian "Shared database" di `CLAUDE.md`. Tabel `users` dimigrasi dari
+> sini; tabel-tabel milik SPPD sendiri (termasuk yang di-prefix `sppd_`) dimigrasi langsung dari
+> project SPPD.
+
 Buka `.env` dan sesuaikan minimal bagian berikut:
 
 - `DB_DATABASE`, `DB_USERNAME`, `DB_PASSWORD` - kredensial MySQL lokal kamu.

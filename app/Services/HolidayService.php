@@ -5,7 +5,6 @@ namespace App\Services;
 use App\Models\Holiday;
 use Illuminate\Support\Carbon;
 
-// Mirrors backend/src/modules/holiday/holiday.service.ts exactly.
 class HolidayService
 {
     public function listHolidays(?Carbon $from = null, ?Carbon $to = null)

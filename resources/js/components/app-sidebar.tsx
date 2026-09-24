@@ -5,6 +5,7 @@ import {
   CalendarOff,
   ClipboardList,
   FileText,
+  Home,
   LayoutDashboard,
   LogOut,
   QrCode,
@@ -46,7 +47,13 @@ interface NavGroup {
 }
 
 const adminNav: NavGroup[] = [
-  { label: "Menu", items: [{ title: "Dashboard", url: "/dashboard", icon: LayoutDashboard }] },
+  {
+    label: "Menu",
+    items: [
+      { title: "Menu Utama", url: "/menu-utama", icon: Home },
+      { title: "Dashboard", url: "/absen/dashboard", icon: LayoutDashboard },
+    ],
+  },
   {
     label: "Absensi",
     items: [
@@ -77,7 +84,8 @@ const guruNav: NavGroup[] = [
   {
     label: "Menu",
     items: [
-      { title: "Dashboard", url: "/dashboard", icon: LayoutDashboard },
+      { title: "Menu Utama", url: "/menu-utama", icon: Home },
+      { title: "Dashboard", url: "/absen/dashboard", icon: LayoutDashboard },
       { title: "QR Saya", url: "/qr", icon: QrCode },
       { title: "Riwayat Absensi", url: "/riwayat", icon: ClipboardList },
       { title: "Izin & Sakit", url: "/izin", icon: FileText },
@@ -86,16 +94,12 @@ const guruNav: NavGroup[] = [
   },
 ]
 
-// Kepsek checks in like a guru (own attendance/izin) plus a subset of
-// Admin's oversight pages - but never the kiosk scan station, that stays an
-// Admin-only operator concern. Split into two groups so the longer combined
-// menu still scans easily: personal stuff first, school-wide oversight
-// after.
 const kepsekNav: NavGroup[] = [
   {
     label: "Absensi Saya",
     items: [
-      { title: "Dashboard", url: "/dashboard", icon: LayoutDashboard },
+      { title: "Menu Utama", url: "/menu-utama", icon: Home },
+      { title: "Dashboard", url: "/absen/dashboard", icon: LayoutDashboard },
       { title: "QR Saya", url: "/qr", icon: QrCode },
       { title: "Riwayat Absensi", url: "/riwayat", icon: ClipboardList },
       { title: "Izin & Sakit Saya", url: "/izin", icon: FileText },
@@ -167,7 +171,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
             <SidebarGroupContent>
               <SidebarMenu>
                 {group.items.map((item) => {
-                  const isExact = item.url === "/dashboard"
+                  const isExact = item.url === "/menu-utama"
                   const isActive = isExact
                     ? pathname === item.url
                     : pathname.startsWith(item.url)

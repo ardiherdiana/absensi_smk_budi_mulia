@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Attributes\Fillable;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -11,6 +12,8 @@ use Illuminate\Support\Str;
 #[Fillable(['userId', 'nama', 'noHp', 'mapel', 'fotoUrl', 'aktif', 'qrToken'])]
 class Guru extends Model
 {
+    use HasFactory;
+
     protected $table = 'guru';
 
     public $incrementing = false;
@@ -25,11 +28,6 @@ class Guru extends Model
     {
         static::creating(function (Guru $guru) {
             $guru->id ??= (string) Str::ulid();
-            // Permanent unique token encoded into this guru's static QR code
-            // - shown to the school's barcode/QR scanner station to record
-            // absen masuk/pulang. Unlike the old rotating kiosk token, this
-            // never expires on its own; it only changes if an admin
-            // explicitly regenerates it (e.g. card lost).
             $guru->qrToken ??= bin2hex(random_bytes(16));
         });
     }

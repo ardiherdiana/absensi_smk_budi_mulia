@@ -7,8 +7,6 @@ use App\Services\SettingsService;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 
-// Mirrors backend/src/modules/kiosk/kiosk.routes.ts - the USB barcode/QR
-// scanner scan station (keyboard-emulation device, not a camera).
 class KioskController extends Controller
 {
     public function __construct(

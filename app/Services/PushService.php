@@ -4,7 +4,6 @@ namespace App\Services;
 
 use App\Models\PushSubscription;
 
-// Mirrors backend/src/modules/push/push.service.ts.
 class PushService
 {
     public function subscribe(string $userId, string $endpoint, string $p256dh, string $auth): PushSubscription

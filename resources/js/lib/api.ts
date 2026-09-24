@@ -3,9 +3,6 @@ import axios from "axios"
 axios.defaults.withCredentials = true
 axios.defaults.headers.common["X-Requested-With"] = "XMLHttpRequest"
 
-// Same-origin session app now (Inertia) - no separate API origin/JWT bearer
-// token, so this is just a thin axios wrapper kept API-compatible with the
-// original fetch-based client so call sites barely change.
 export function assetUrl(path: string): string {
   return path
 }

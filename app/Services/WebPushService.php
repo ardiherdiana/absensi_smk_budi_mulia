@@ -6,7 +6,6 @@ use App\Models\PushSubscription;
 use Minishlink\WebPush\Subscription;
 use Minishlink\WebPush\WebPush;
 
-// Mirrors backend/src/lib/webPush.ts.
 class WebPushService
 {
     private ?WebPush $webPush = null;

@@ -12,14 +12,9 @@ use PhpOffice\PhpSpreadsheet\Worksheet\Worksheet;
 use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
-// Shared "headers + rows -> downloadable, letterhead-styled .xlsx" builder
-// for the rekap and briefing export buttons - replaces the old plain-CSV
-// export (CSV has no styling at all, so none of this was possible in that
-// format). The last column of every row is always treated as the
-// attendance status, used both for per-row coloring and the summary block.
 class XlsxExport
 {
-    private const HEADER_FILL = 'F97316'; // Tailwind orange-500
+    private const HEADER_FILL = 'F97316';
 
     /** Soft background + dark text per status, echoing the badge colors
      * used on the web pages (success/warning/destructive/outline). */
@@ -40,7 +35,7 @@ class XlsxExport
     ];
 
     /** @param  string[]  $headers
-     * @param  array<int, array<int, string>>  $rows  last column of each row is the status
+     * @param  array<int, array<int, string>>  $rows  status defaults to the last column unless $statusColumnIndex says otherwise
      */
     public static function download(
         string $filename,
@@ -49,15 +44,15 @@ class XlsxExport
         string $period,
         array $headers,
         array $rows,
+        ?int $statusColumnIndex = null,
     ): StreamedResponse {
-        $spreadsheet = new Spreadsheet();
+        $spreadsheet = new Spreadsheet;
         $sheet = $spreadsheet->getActiveSheet();
 
         $columnCount = count($headers);
-        // Status is always the last column - $lastColumn doubles as its
-        // letter (e.g. "E") since there's nothing after it.
         $lastColumn = Coordinate::stringFromColumnIndex($columnCount);
-        $statusColumnIndex = $columnCount - 1; // 0-based index into each row array
+        $statusColumnIndex ??= $columnCount - 1;
+        $statusColumn = Coordinate::stringFromColumnIndex($statusColumnIndex + 1);
 
         self::writeLetterhead($sheet, $schoolName, $title, $period, $lastColumn);
 
@@ -70,7 +65,7 @@ class XlsxExport
         $lastDataRow = $firstDataRow + count($rows) - 1;
 
         if ($rows !== []) {
-            self::styleDataRows($sheet, $firstDataRow, $lastDataRow, $lastColumn);
+            self::styleDataRows($sheet, $firstDataRow, $lastDataRow, $lastColumn, $statusColumn);
             self::writeSummary($sheet, $lastDataRow, $rows, $statusColumnIndex);
         }
 
@@ -123,20 +118,20 @@ class XlsxExport
         $sheet->getRowDimension($headerRow)->setRowHeight(20);
     }
 
-    private static function styleDataRows(Worksheet $sheet, int $firstDataRow, int $lastDataRow, string $lastColumn): void
+    private static function styleDataRows(Worksheet $sheet, int $firstDataRow, int $lastDataRow, string $lastColumn, string $statusColumn): void
     {
         $sheet->getStyle("A{$firstDataRow}:{$lastColumn}{$lastDataRow}")->applyFromArray([
             'borders' => ['allBorders' => ['borderStyle' => Border::BORDER_THIN, 'color' => ['rgb' => 'E5E7EB']]],
         ]);
 
         for ($row = $firstDataRow; $row <= $lastDataRow; $row++) {
-            $status = strtoupper((string) $sheet->getCell("{$lastColumn}{$row}")->getValue());
+            $status = strtoupper((string) $sheet->getCell("{$statusColumn}{$row}")->getValue());
             $colors = self::STATUS_COLORS[$status] ?? null;
             if ($colors === null) {
                 continue;
             }
 
-            $sheet->getStyle("{$lastColumn}{$row}")->applyFromArray([
+            $sheet->getStyle("{$statusColumn}{$row}")->applyFromArray([
                 'font' => ['bold' => true, 'color' => ['rgb' => $colors['text']]],
                 'fill' => ['fillType' => Fill::FILL_SOLID, 'startColor' => ['rgb' => $colors['bg']]],
                 'alignment' => ['horizontal' => Alignment::HORIZONTAL_CENTER],

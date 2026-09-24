@@ -48,7 +48,7 @@ function GuruAvatar({ guru, size }: { guru: Pick<Guru, "nama" | "fotoUrl">; size
   )
 }
 
-const MAX_FOTO_BYTES = 2 * 1024 * 1024 // matches backend's max:2048 (KB)
+const MAX_FOTO_BYTES = 2 * 1024 * 1024
 
 interface FormState {
   id: string | null

@@ -11,9 +11,6 @@ use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Inertia\Inertia;
 
-// Mirrors backend/src/modules/guru/guru.routes.ts. List/detail are open to
-// ADMIN+KEPSEK (read-only oversight); every mutation is ADMIN-only, enforced
-// here since the route group itself allows both roles through.
 class GuruController extends Controller
 {
     public function __construct(

@@ -72,11 +72,11 @@ export function AdminDashboardPage({ guruList, today, pendingIzin, notifications
   return (
     <div className="flex flex-col gap-6">
       <div>
-        <h1 className="text-xl font-semibold">Dashboard</h1>
+        <h1 className="text-xl font-semibold">Dashboard Absensi</h1>
         <p className="text-sm text-muted-foreground">Ringkasan absensi hari ini</p>
       </div>
 
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
         {stats.map((stat) => (
           <Card key={stat.label}>
             <CardHeader className="pb-2">
@@ -99,11 +99,18 @@ export function AdminDashboardPage({ guruList, today, pendingIzin, notifications
           <CardTitle className="text-base">Status Kehadiran Hari Ini</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="grid gap-4 sm:grid-cols-3">
+          <div className="grid gap-4 sm:grid-cols-3 lg:grid-cols-2">
             {STATUS_CARDS.map(({ status, icon: Icon, tint }) => {
               const rows = today.filter((r) => r.status === status)
               return (
-                <div key={status} className={cn("rounded-lg border p-4", tint)}>
+                <div
+                  key={status}
+                  className={cn(
+                    "rounded-lg border p-4",
+                    tint,
+                    status === "HADIR" && "lg:col-span-2"
+                  )}
+                >
                   <div className="flex items-center gap-2 text-sm font-medium">
                     <Icon className="size-4" />
                     {statusLabel(status)}

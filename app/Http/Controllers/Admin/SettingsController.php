@@ -8,7 +8,6 @@ use App\Services\SettingsService;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 
-// Mirrors backend/src/modules/settings/settings.routes.ts.
 class SettingsController extends Controller
 {
     public function __construct(

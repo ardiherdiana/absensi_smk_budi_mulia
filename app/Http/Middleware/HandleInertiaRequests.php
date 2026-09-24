@@ -45,15 +45,26 @@ class HandleInertiaRequests extends Middleware
                     'id' => $user->id,
                     'username' => $user->username,
                     'role' => $user->role,
+                    'name' => $user->name,
+                    'jabatan' => $user->jabatan,
+                    'signature_path' => $user->signature_path,
+                    'is_active' => $user->is_active,
                     'guru' => $user->guru ? [
                         'id' => $user->guru->id,
                         'nama' => $user->guru->nama,
                         'fotoUrl' => $user->guru->fotoUrl,
                     ] : null,
                 ] : null,
+                // Role SPPD (spatie/laravel-permission) — terpisah dari `role` absensi (ADMIN/GURU/KEPSEK).
+                'roles' => $user?->getRoleNames() ?? [],
+            ],
+            'notifications' => [
+                'unreadCount' => $user?->unreadNotifications()->count() ?? 0,
             ],
             'flash' => [
                 'toast' => fn () => $request->session()->get('toast'),
+                'success' => fn () => $request->session()->get('success'),
+                'error' => fn () => $request->session()->get('error'),
             ],
         ];
     }

@@ -10,8 +10,6 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Inertia\Inertia;
 
-// Mirrors js/frontend's DashboardHome - ADMIN gets the oversight dashboard,
-// GURU/KEPSEK both get the same self-service dashboard.
 class DashboardController extends Controller
 {
     public function __construct(

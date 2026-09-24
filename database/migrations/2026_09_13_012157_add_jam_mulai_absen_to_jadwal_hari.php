@@ -13,16 +13,9 @@ return new class extends Migration
     public function up(): void
     {
         Schema::table('jadwal_hari', function (Blueprint $table) {
-            // Earliest time absen masuk is allowed at all - separate from
-            // `jamMasuk`, which stays the HADIR/TELAT reference point (still
-            // compared only against `batasTelat`).
             $table->string('jamMulaiAbsen')->default('07:00')->after('aktif');
         });
 
-        // Backfill from each row's own jamMasuk (not the flat '07:00'
-        // default above) so any day already customized away from the
-        // default keeps opening at exactly the same time it does today,
-        // until an admin explicitly sets an earlier jamMulaiAbsen.
         DB::statement('UPDATE `jadwal_hari` SET `jamMulaiAbsen` = `jamMasuk`');
     }
 

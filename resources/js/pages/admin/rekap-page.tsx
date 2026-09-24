@@ -1,16 +1,23 @@
 import * as React from "react"
 import { router, useForm } from "@inertiajs/react"
 import { toast } from "sonner"
-import { Download, Pencil } from "lucide-react"
+import { Download, Pencil, X } from "lucide-react"
 
 import { ApiError, downloadFile } from "@/lib/api"
 import type { Guru, RekapRow, StatusKehadiran } from "@/lib/types"
-import { formatJam, statusBadgeVariant, statusLabel } from "@/lib/attendance-format"
+import {
+  STATUS_OPTIONS,
+  formatJam,
+  statusBadgeVariant,
+  statusLabel,
+  toTimeInputValue,
+} from "@/lib/attendance-format"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { DataPagination } from "@/components/data-pagination"
 import { DatePicker } from "@/components/date-picker"
 import { GuruCombobox } from "@/components/guru-combobox"
+import { TimePicker } from "@/components/time-picker"
 import {
   Dialog,
   DialogContent,
@@ -36,8 +43,6 @@ import {
   TableRow,
 } from "@/components/ui/table"
 
-const STATUS_OPTIONS: StatusKehadiran[] = ["HADIR", "TELAT", "IZIN", "SAKIT", "ALPA"]
-
 interface Props {
   rows: RekapRow[]
   from: string
@@ -56,6 +61,8 @@ export function RekapPage({ rows, from, to, guruId, guruList }: Props) {
     guruId: "",
     tanggal: "",
     status: "HADIR" as StatusKehadiran,
+    jamMasuk: "",
+    jamPulang: "",
     catatan: "",
   })
 
@@ -79,6 +86,8 @@ export function RekapPage({ rows, from, to, guruId, guruList }: Props) {
       guruId: row.guruId,
       tanggal: row.tanggal,
       status: row.status ?? "HADIR",
+      jamMasuk: toTimeInputValue(row.jamMasuk),
+      jamPulang: toTimeInputValue(row.jamPulang),
       catatan: "",
     })
   }
@@ -230,6 +239,50 @@ export function RekapPage({ rows, from, to, guruId, guruList }: Props) {
                     <div className="font-medium">{editing.nama}</div>
                     <div className="text-xs text-muted-foreground">{editing.tanggal}</div>
                   </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <Field>
+                      <FieldLabel htmlFor="editJamMasuk">Jam Masuk</FieldLabel>
+                      <div className="flex items-center gap-2">
+                        <TimePicker
+                          id="editJamMasuk"
+                          value={data.jamMasuk}
+                          onChange={(v) => setData("jamMasuk", v)}
+                          className="w-full"
+                        />
+                        {data.jamMasuk && (
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon-sm"
+                            onClick={() => setData("jamMasuk", "")}
+                          >
+                            <X />
+                          </Button>
+                        )}
+                      </div>
+                    </Field>
+                    <Field>
+                      <FieldLabel htmlFor="editJamPulang">Jam Pulang</FieldLabel>
+                      <div className="flex items-center gap-2">
+                        <TimePicker
+                          id="editJamPulang"
+                          value={data.jamPulang}
+                          onChange={(v) => setData("jamPulang", v)}
+                          className="w-full"
+                        />
+                        {data.jamPulang && (
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon-sm"
+                            onClick={() => setData("jamPulang", "")}
+                          >
+                            <X />
+                          </Button>
+                        )}
+                      </div>
+                    </Field>
+                  </div>
                   <Field>
                     <FieldLabel htmlFor="editStatus">Status</FieldLabel>
                     <Select
@@ -258,9 +311,17 @@ export function RekapPage({ rows, from, to, guruId, guruList }: Props) {
                       placeholder="Alasan koreksi, misal: lupa absen pulang, konfirmasi hadir seharian"
                     />
                   </Field>
-                  {(errors.status ?? errors.catatan ?? (errors as Record<string, string>).message) && (
+                  {(errors.status ??
+                    errors.jamMasuk ??
+                    errors.jamPulang ??
+                    errors.catatan ??
+                    (errors as Record<string, string>).message) && (
                     <p className="text-sm text-destructive" role="alert">
-                      {errors.status ?? errors.catatan ?? (errors as Record<string, string>).message}
+                      {errors.status ??
+                        errors.jamMasuk ??
+                        errors.jamPulang ??
+                        errors.catatan ??
+                        (errors as Record<string, string>).message}
                     </p>
                   )}
                   <DialogFooter>

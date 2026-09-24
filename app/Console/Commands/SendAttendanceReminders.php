@@ -4,15 +4,13 @@ namespace App\Console\Commands;
 
 use App\Models\Attendance;
 use App\Models\Guru;
+use App\Models\Holiday;
 use App\Models\LeaveRequest;
 use App\Services\JadwalService;
 use App\Services\WebPushService;
 use Illuminate\Console\Command;
 use Illuminate\Support\Carbon;
 
-// Mirrors backend/src/lib/reminderScheduler.ts - runs every minute (see
-// routes/console.php) and pushes a reminder 15 minutes before jam
-// masuk/pulang to whoever hasn't checked in/out yet.
 class SendAttendanceReminders extends Command
 {
     protected $signature = 'attendance:send-reminders';
@@ -29,7 +27,7 @@ class SendAttendanceReminders extends Command
             return;
         }
 
-        if (\App\Models\Holiday::whereDate('tanggal', $today->toDateString())->exists()) {
+        if (Holiday::whereDate('tanggal', $today->toDateString())->exists()) {
             return;
         }
 

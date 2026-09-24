@@ -12,9 +12,6 @@ return new class extends Migration
     public function up(): void
     {
         Schema::table('jadwal_hari', function (Blueprint $table) {
-            // Closing gate for absen briefing - nullable, same as
-            // jamBriefing itself: no value means no closing gate at all,
-            // matching today's behavior exactly until an admin sets one.
             $table->string('jamSelesaiBriefing')->nullable()->after('jamBriefing');
         });
     }

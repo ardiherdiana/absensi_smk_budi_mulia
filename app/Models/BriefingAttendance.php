@@ -7,7 +7,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Support\Str;
 
-#[Fillable(['guruId', 'tanggal', 'waktu'])]
+#[Fillable(['guruId', 'tanggal', 'waktu', 'status', 'catatan'])]
 class BriefingAttendance extends Model
 {
     protected $table = 'briefing_attendance';
@@ -18,7 +18,7 @@ class BriefingAttendance extends Model
 
     const CREATED_AT = 'createdAt';
 
-    const UPDATED_AT = null;
+    const UPDATED_AT = 'updatedAt';
 
     protected static function booted(): void
     {

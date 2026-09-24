@@ -17,6 +17,7 @@
 
     <title>Absensi Guru - SMK Budi Mulia</title>
 
+    @routes
     @viteReactRefresh
     @vite(['resources/js/main.tsx'])
     @inertiaHead

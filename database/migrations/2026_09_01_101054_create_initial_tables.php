@@ -4,12 +4,6 @@ use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 
-// Mirrors js/backend/prisma/migrations/20260901101054_init exactly - ids are
-// string cuid-style, matching the original Prisma schema's VARCHAR(191)
-// primary keys (see App\Models for how they're generated). Constraint names
-// are spelled out explicitly to match Prisma's own naming convention
-// (`{table}_{col}_key` / `_fkey` / `_idx`) since later migrations reference
-// them by name when dropping/altering.
 return new class extends Migration
 {
     public function up(): void

@@ -5,11 +5,6 @@ use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 
-// Mirrors js/backend/prisma/migrations/20260911010000_jadwal_hari_and_qr_statis
-// exactly, including the raw backfill SQL (kept as literal SQL rather than
-// translated to the query builder, so the behavior - reading whatever the
-// singleton `settings` row has via COALESCE - can't drift from the
-// original).
 return new class extends Migration
 {
     public function up(): void

@@ -4,7 +4,6 @@ use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 
-// Mirrors js/backend/prisma/migrations/20260910000002_add_push_subscriptions
 return new class extends Migration
 {
     public function up(): void

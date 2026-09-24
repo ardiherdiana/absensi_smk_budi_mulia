@@ -1,5 +1,6 @@
-*.log
-.DS_Store
+# ---------------------------------------------------------------------------
+# Rahasia & konfigurasi lokal
+# ---------------------------------------------------------------------------
 
 # Semua file .env harus diabaikan - env aktif, backup, per-environment
 # (.env.local, .env.production, .env.testing, dst), maupun hasil dump
@@ -9,40 +10,83 @@
 .env.*
 !.env.example
 
-.phpactor.json
-.phpunit.cache
-.phpunit.result.cache
-/.codex
-/.cursor/
-/.idea
-/.nova
-/.vscode
-/.zed
 /auth.json
-/coverage
+/storage/*.key
+
+# Setting/instruksi lokal Claude Code (bisa berisi override permission/token
+# MCP yang sifatnya personal per-mesin).
+/.claude/settings.local.json
+/CLAUDE.local.md
+
+# ---------------------------------------------------------------------------
+# Dependensi & hasil build
+# ---------------------------------------------------------------------------
+
+/vendor
 /node_modules
 /public/build
 /public/fonts-manifest.dev.json
 /public/hot
 /public/storage
-/storage/*.key
+
+# ---------------------------------------------------------------------------
+# Data runtime
+# (cache, session, log, dan file upload sudah punya .gitignore sendiri
+# di dalam storage/ dan bootstrap/cache/)
+# ---------------------------------------------------------------------------
+
+*.log
 /storage/pail
-/vendor
+
+# Cache font dompdf untuk PDF SPPD (config/dompdf.php) - dibuat otomatis
+# saat PDF pertama kali dirender.
+/storage/fonts
+
+# Sisa salinan nyasar dari storage/app (berisi foto guru duplikat). Upload
+# asli ada di storage/app/public dan storage/app/private; app/ hanya boleh
+# berisi kode PHP.
+/app/private/
+/app/public/
+
+# ---------------------------------------------------------------------------
+# Database & data sungguhan
+# ---------------------------------------------------------------------------
 
 # Database SQLite lokal (dipakai phpunit/testing) - bisa berisi data
 # hasil sinkron/seed nyata, jangan pernah ikut commit.
 *.sqlite
 *.sqlite-journal
+*.sqlite-shm
+*.sqlite-wal
 
-# Dump database production asli yang dipakai ProductionSyncSeeder -
-# berisi data nama/no hp/hash password sungguhan, jangan pernah commit.
-/database/seeders/data/production.sql
+# Dump database production asli (mis. production.sql yang dipakai
+# ProductionSyncSeeder) - berisi data nama/no hp/hash password sungguhan,
+# jangan pernah commit.
+/database/seeders/data/*.sql
 
-# Setting lokal Claude Code (bisa berisi override permission/token MCP
-# yang sifatnya personal per-mesin).
-/.claude/settings.local.json
+# Catatan/dokumen kerja pribadi (LOGIN.md, RENCANA_MAGANG.md, dst) - bukan
+# bagian dari aplikasi, jangan ikut commit.
+/md
 
+# ---------------------------------------------------------------------------
+# Testing, editor, & OS
+# ---------------------------------------------------------------------------
+
+.phpunit.cache
+.phpunit.result.cache
+/coverage
+
+.phpactor.json
+/.codex
+/.cursor/
+/.fleet
+/.idea
+/.nova
+/.vscode
+/.zed
 _ide_helper.php
 Homestead.json
 Homestead.yaml
+
+.DS_Store
 Thumbs.db

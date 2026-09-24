@@ -8,10 +8,6 @@ use App\Models\Holiday;
 use App\Models\LeaveRequest;
 use Illuminate\Support\Carbon;
 
-// Mirrors backend/src/modules/briefing/briefing.service.ts exactly - admin
-// scans a guru/kepsek's static QR to record them at today's briefing,
-// gated on the day's own jamBriefing the same way absen masuk/pulang are
-// gated on their own jam.
 class BriefingService
 {
     public function __construct(private JadwalService $jadwal) {}
@@ -71,20 +67,43 @@ class BriefingService
         }
 
         $existing = BriefingAttendance::where('guruId', $guru->id)->whereDate('tanggal', $tanggal)->first();
-        if ($existing) {
+        if ($existing && $existing->waktu) {
             abort(409, "{$guru->nama} sudah absen briefing hari ini");
         }
 
-        $record = BriefingAttendance::create([
-            'guruId' => $guru->id,
-            'tanggal' => $tanggal,
-            'waktu' => $now,
-        ]);
+        if ($existing) {
+            // A manual correction (e.g. ALPA) already exists for today without
+            // an actual scan - the real scan now taking place supersedes it.
+            $existing->update(['waktu' => $now, 'status' => null, 'catatan' => null]);
+            $record = $existing;
+        } else {
+            $record = BriefingAttendance::create([
+                'guruId' => $guru->id,
+                'tanggal' => $tanggal,
+                'waktu' => $now,
+            ]);
+        }
 
         return ['nama' => $guru->nama, 'fotoUrl' => $guru->fotoUrl, 'waktu' => $record->waktu];
     }
 
-    /** @return array<int, array{guruId: string, nama: string, tanggal: string, waktu: ?string, status: 'HADIR'|'ALPA'|null}> */
+    /** Admin correction from the briefing rekap table - lets an admin set/fix
+     * the status, check-in time, and reason for one guru's briefing
+     * attendance on one date, the same way AttendanceService::manualUpsert
+     * does for regular attendance. */
+    public function manualUpsert(string $guruId, Carbon $tanggal, string $status, ?string $waktu, ?string $catatan): BriefingAttendance
+    {
+        return BriefingAttendance::updateOrCreate(
+            ['guruId' => $guruId, 'tanggal' => $tanggal->toDateString()],
+            [
+                'status' => $status,
+                'waktu' => $waktu ? Carbon::parse($tanggal->toDateString().' '.$waktu) : null,
+                'catatan' => $catatan,
+            ]
+        );
+    }
+
+    /** @return array<int, array{guruId: string, nama: string, tanggal: string, waktu: ?string, status: 'HADIR'|'TELAT'|'IZIN'|'SAKIT'|'ALPA'|null}> */
     public function rekapBriefing(Carbon $from, Carbon $to, ?string $guruId = null): array
     {
         $guruQuery = Guru::query()->orderBy('nama');
@@ -135,8 +154,11 @@ class BriefingService
                         'guruId' => $guru->id,
                         'nama' => $guru->nama,
                         'tanggal' => $date->toDateString(),
-                        'waktu' => $record->waktu->toIso8601String(),
-                        'status' => 'HADIR',
+                        'waktu' => $record->waktu?->toIso8601String(),
+                        // A real scan never sets `status` (only `waktu`), so it
+                        // defaults to HADIR; a manual correction always sets it
+                        // explicitly, including to HADIR/TELAT with no `waktu`.
+                        'status' => $record->status ?? 'HADIR',
                     ];
 
                     continue;

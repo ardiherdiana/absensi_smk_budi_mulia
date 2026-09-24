@@ -53,9 +53,6 @@ class ProductionSyncSeeder extends Seeder
 
         Schema::disableForeignKeyConstraints();
 
-        // jadwal_hari isn't in TABLES_IN_ORDER's truncate loop by coincidence
-        // of table order - it's truncated here explicitly since its data is
-        // hand-built below instead of extracted from the dump.
         foreach ([...self::TABLES_IN_ORDER, 'jadwal_hari'] as $table) {
             DB::table($table)->truncate();
         }
@@ -63,37 +60,13 @@ class ProductionSyncSeeder extends Seeder
         foreach (self::TABLES_IN_ORDER as $table) {
             $insert = $this->extractInsert($sql, $table);
             if ($insert === null) {
-                // Empty in the dump (no "Dumping data" section at all) -
-                // holidays and briefing_attendance both had zero rows at
-                // export time.
                 continue;
             }
 
-            // The dump's guru/leave_requests upload URLs still carry the
-            // old Node backend's `/api/uploads/...` prefix - this app
-            // serves them from `/uploads/...` (no /api) since the Inertia
-            // migration. The actual files were never part of this SQL
-            // dump anyway (they live on production's disk, not its
-            // database), so these will still 404 locally either way -
-            // this just keeps the URL *shape* consistent with the current
-            // app instead of importing a stale, doubly-wrong path.
             if (in_array($table, ['guru', 'leave_requests'], true)) {
                 $insert = str_replace('/api/uploads/', '/uploads/', $insert);
             }
 
-            // These password hashes were produced by Node's bcryptjs,
-            // which stamps hashes `$2b$...`. PHP's password_verify()
-            // resolves a `$2b$` hash identically to the equivalent `$2y$`
-            // one (verified: renaming just the prefix on a known hash
-            // still verifies the same password correctly) - but Laravel's
-            // Hash::check() now defaults to a strict algorithm check
-            // (config('hashing.bcrypt.verify'), true by default in this
-            // framework version) that only recognizes `$2y$` as "bcrypt"
-            // and throws instead of comparing for anything else. Without
-            // this, every imported account would 500 on login. Same fix
-            // production itself will need before these real accounts can
-            // log in there post-migration - this seeder can't fix that
-            // globally, only its own copy of the data.
             if ($table === 'users') {
                 $insert = str_replace('$2b$', '$2y$', $insert);
             }

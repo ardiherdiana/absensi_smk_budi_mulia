@@ -4,13 +4,12 @@ namespace App\Services;
 
 use App\Models\Attendance;
 use App\Models\Guru;
+use App\Models\Holiday;
 use App\Models\JadwalHari;
 use App\Models\LeaveRequest;
 use App\Support\Geofence;
 use Illuminate\Support\Carbon;
 
-// Mirrors backend/src/modules/attendance/attendance.service.ts exactly -
-// same masuk/pulang state machine, same gates, same rekap/streak logic.
 class AttendanceService
 {
     public function __construct(
@@ -147,7 +146,7 @@ class AttendanceService
             ->get();
     }
 
-    /** @return array<int, array{guruId: string, nama: string, tanggal: string, jamMasuk: ?string, jamPulang: ?string, status: ?string}> */
+    /** @return array<int, array{guruId: string, nama: string, tanggal: string, jamMasuk: ?string, jamPulang: ?string, status: ?string, catatan: ?string}> */
     public function rekap(Carbon $from, Carbon $to, ?string $guruId = null): array
     {
         $guruQuery = Guru::query()->orderBy('nama');
@@ -169,7 +168,7 @@ class AttendanceService
             ->whereDate('tanggalSelesai', '>=', $from->toDateString())
             ->get();
 
-        $holidays = \App\Models\Holiday::whereDate('tanggal', '>=', $from->toDateString())
+        $holidays = Holiday::whereDate('tanggal', '>=', $from->toDateString())
             ->whereDate('tanggal', '<=', $to->toDateString())
             ->get();
         $holidaySet = $holidays->map(fn ($h) => $h->tanggal->toDateString())->flip();
@@ -197,6 +196,7 @@ class AttendanceService
                         'jamMasuk' => $attendance->jamMasuk?->toIso8601String(),
                         'jamPulang' => $attendance->jamPulang?->toIso8601String(),
                         'status' => $attendance->statusMasuk,
+                        'catatan' => $attendance->catatan,
                     ];
 
                     continue;
@@ -216,6 +216,7 @@ class AttendanceService
                         'jamMasuk' => null,
                         'jamPulang' => null,
                         'status' => $leave->jenis,
+                        'catatan' => null,
                     ];
 
                     continue;
@@ -228,6 +229,7 @@ class AttendanceService
                     'jamMasuk' => null,
                     'jamPulang' => null,
                     'status' => $date->lte($today) ? 'ALPA' : null,
+                    'catatan' => null,
                 ];
             }
         }
@@ -275,7 +277,7 @@ class AttendanceService
             ->whereDate('tanggalSelesai', '>=', $windowStart->toDateString())
             ->get();
 
-        $holidaySet = \App\Models\Holiday::whereDate('tanggal', '>=', $windowStart->toDateString())
+        $holidaySet = Holiday::whereDate('tanggal', '>=', $windowStart->toDateString())
             ->whereDate('tanggal', '<=', $today->toDateString())
             ->get()
             ->map(fn ($h) => $h->tanggal->toDateString())
@@ -352,11 +354,16 @@ class AttendanceService
         return ['guruId' => $guru->id, 'nama' => $guru->nama, 'fotoUrl' => $guru->fotoUrl, 'streak' => $streak, 'days' => $days];
     }
 
-    public function manualUpsert(string $guruId, Carbon $tanggal, string $status, ?string $catatan): Attendance
+    public function manualUpsert(string $guruId, Carbon $tanggal, string $status, ?string $jamMasuk, ?string $jamPulang, ?string $catatan): Attendance
     {
         return Attendance::updateOrCreate(
             ['guruId' => $guruId, 'tanggal' => $tanggal->toDateString()],
-            ['statusMasuk' => $status, 'catatan' => $catatan]
+            [
+                'statusMasuk' => $status,
+                'jamMasuk' => $jamMasuk ? Carbon::parse($tanggal->toDateString().' '.$jamMasuk) : null,
+                'jamPulang' => $jamPulang ? Carbon::parse($tanggal->toDateString().' '.$jamPulang) : null,
+                'catatan' => $catatan,
+            ]
         );
     }
 }

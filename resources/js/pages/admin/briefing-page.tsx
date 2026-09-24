@@ -1,18 +1,40 @@
 import * as React from "react"
 import { Html5Qrcode, Html5QrcodeScannerState } from "html5-qrcode"
 import { toast } from "sonner"
-import { Clock, Download } from "lucide-react"
+import { Clock, Download, Pencil } from "lucide-react"
 
 import { api, ApiError, downloadFile } from "@/lib/api"
-import type { BriefingCheckinResult, BriefingRekapRow, Guru } from "@/lib/types"
-import { formatJam, statusBadgeVariant, statusLabel } from "@/lib/attendance-format"
+import type { BriefingCheckinResult, BriefingRekapRow, Guru, StatusKehadiran } from "@/lib/types"
+import {
+  STATUS_OPTIONS,
+  formatJam,
+  statusBadgeVariant,
+  statusLabel,
+  toTimeInputValue,
+} from "@/lib/attendance-format"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { DataPagination } from "@/components/data-pagination"
 import { DatePicker } from "@/components/date-picker"
 import { GuruCombobox } from "@/components/guru-combobox"
-import { Field, FieldLabel } from "@/components/ui/field"
+import { TimePicker } from "@/components/time-picker"
+import {
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
+import { Field, FieldGroup, FieldLabel } from "@/components/ui/field"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
+import { Textarea } from "@/components/ui/textarea"
 import {
   Table,
   TableBody,
@@ -23,10 +45,6 @@ import {
 } from "@/components/ui/table"
 
 const READER_ID = "briefing-qr-reader"
-// Ignore repeat decodes of the same QR within this window - the camera
-// keeps re-reading the same code for several frames while the admin holds
-// the phone steady on one guru, and the camera is never stopped between
-// scans (the admin walks around scanning many people back-to-back).
 const SAME_TOKEN_COOLDOWN_MS = 4000
 
 type CameraStatus = "starting" | "scanning" | "error"
@@ -66,9 +84,6 @@ export function BriefingPage({
   const busyRef = React.useRef(false)
   const lastTokenRef = React.useRef<{ token: string; at: number } | null>(null)
 
-  // Re-checked periodically (not just on mount) so a page left open while
-  // waiting for briefing time flips to the camera on its own, no refresh
-  // needed.
   const [now, setNow] = React.useState(() => new Date())
   React.useEffect(() => {
     const timer = setInterval(() => setNow(new Date()), 15_000)
@@ -86,6 +101,15 @@ export function BriefingPage({
   const [exporting, setExporting] = React.useState(false)
   const [page, setPage] = React.useState(1)
   const [pageSize, setPageSize] = React.useState(50)
+
+  const [editing, setEditing] = React.useState<BriefingRekapRow | null>(null)
+  const [editForm, setEditForm] = React.useState({
+    status: "HADIR" as StatusKehadiran,
+    waktu: "",
+    catatan: "",
+  })
+  const [editSaving, setEditSaving] = React.useState(false)
+  const [editError, setEditError] = React.useState<string | null>(null)
 
   const loadRows = React.useCallback(() => {
     setLoading(true)
@@ -140,12 +164,6 @@ export function BriefingPage({
     const scanner = new Html5Qrcode(READER_ID)
     scannerRef.current = scanner
 
-    // scanner.stop() throws ("Cannot stop, scanner is not running or
-    // paused.") when called before start() has actually reached the
-    // SCANNING state - which React 18 StrictMode's dev-mode double-invoke
-    // of this effect (mount -> cleanup -> mount) does on every page load,
-    // crashing the whole page. Only stop() when the scanner's own state
-    // says it's actually running/paused.
     function stopIfRunning() {
       const state = scanner.getState()
       if (state === Html5QrcodeScannerState.SCANNING || state === Html5QrcodeScannerState.PAUSED) {
@@ -169,8 +187,6 @@ export function BriefingPage({
           }
         )
         if (cancelled) {
-          // Unmounted while start() was still in flight - stop the camera
-          // now instead of leaving it running past the component's lifetime.
           void stopIfRunning()
           return
         }
@@ -208,6 +224,40 @@ export function BriefingPage({
       toast.error(err instanceof ApiError ? err.message : "Gagal mengunduh Excel")
     } finally {
       setExporting(false)
+    }
+  }
+
+  function openEdit(row: BriefingRekapRow) {
+    setEditing(row)
+    setEditError(null)
+    setEditForm({
+      status: row.status ?? "HADIR",
+      waktu: toTimeInputValue(row.waktu),
+      catatan: "",
+    })
+  }
+
+  async function handleSaveEdit(event: React.FormEvent) {
+    event.preventDefault()
+    if (!editing) return
+
+    setEditSaving(true)
+    setEditError(null)
+    try {
+      await api.post("/briefing/manual", {
+        guruId: editing.guruId,
+        tanggal: editing.tanggal,
+        status: editForm.status,
+        waktu: editForm.waktu,
+        catatan: editForm.catatan,
+      })
+      toast.success("Koreksi absen briefing berhasil disimpan")
+      setEditing(null)
+      loadRows()
+    } catch (err) {
+      setEditError(err instanceof ApiError ? err.message : "Gagal menyimpan koreksi")
+    } finally {
+      setEditSaving(false)
     }
   }
 
@@ -294,18 +344,19 @@ export function BriefingPage({
               <TableHead>Nama</TableHead>
               <TableHead>Waktu</TableHead>
               <TableHead>Status</TableHead>
+              <TableHead className="text-right">Aksi</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {loading ? (
               <TableRow>
-                <TableCell colSpan={5} className="text-center text-muted-foreground">
+                <TableCell colSpan={6} className="text-center text-muted-foreground">
                   Memuat...
                 </TableCell>
               </TableRow>
             ) : paginatedRows.filter((r) => r.status !== null).length === 0 ? (
               <TableRow>
-                <TableCell colSpan={5} className="text-center text-muted-foreground">
+                <TableCell colSpan={6} className="text-center text-muted-foreground">
                   Tidak ada jadwal briefing pada rentang ini
                 </TableCell>
               </TableRow>
@@ -325,6 +376,11 @@ export function BriefingPage({
                         <Badge variant={statusBadgeVariant(row.status)}>{statusLabel(row.status)}</Badge>
                       )}
                     </TableCell>
+                    <TableCell className="text-right">
+                      <Button variant="ghost" size="icon-sm" onClick={() => openEdit(row)}>
+                        <Pencil />
+                      </Button>
+                    </TableCell>
                   </TableRow>
                 ))
             )}
@@ -342,6 +398,84 @@ export function BriefingPage({
           setPage(1)
         }}
       />
+
+      <Dialog open={editing !== null} onOpenChange={(open) => !open && setEditing(null)}>
+        <DialogContent>
+          {editing && (
+            <>
+              <DialogHeader>
+                <DialogTitle>Koreksi Absen Briefing</DialogTitle>
+              </DialogHeader>
+              <form onSubmit={handleSaveEdit}>
+                <FieldGroup>
+                  <div>
+                    <div className="font-medium">{editing.nama}</div>
+                    <div className="text-xs text-muted-foreground">{editing.tanggal}</div>
+                  </div>
+                  <Field>
+                    <FieldLabel htmlFor="editWaktu">Jam Masuk</FieldLabel>
+                    <div className="flex items-center gap-2">
+                      <TimePicker
+                        id="editWaktu"
+                        value={editForm.waktu}
+                        onChange={(v) => setEditForm((f) => ({ ...f, waktu: v }))}
+                      />
+                      {editForm.waktu && (
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => setEditForm((f) => ({ ...f, waktu: "" }))}
+                        >
+                          Kosongkan
+                        </Button>
+                      )}
+                    </div>
+                  </Field>
+                  <Field>
+                    <FieldLabel htmlFor="editStatus">Status</FieldLabel>
+                    <Select
+                      items={Object.fromEntries(STATUS_OPTIONS.map((s) => [s, statusLabel(s)]))}
+                      value={editForm.status}
+                      onValueChange={(v) => v && setEditForm((f) => ({ ...f, status: v as StatusKehadiran }))}
+                    >
+                      <SelectTrigger id="editStatus" className="w-full">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {STATUS_OPTIONS.map((s) => (
+                          <SelectItem key={s} value={s}>
+                            {statusLabel(s)}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </Field>
+                  <Field>
+                    <FieldLabel htmlFor="editCatatan">Alasan (opsional)</FieldLabel>
+                    <Textarea
+                      id="editCatatan"
+                      value={editForm.catatan}
+                      onChange={(e) => setEditForm((f) => ({ ...f, catatan: e.target.value }))}
+                      placeholder="Alasan koreksi, misal: lupa scan, konfirmasi hadir briefing"
+                    />
+                  </Field>
+                  {editError && (
+                    <p className="text-sm text-destructive" role="alert">
+                      {editError}
+                    </p>
+                  )}
+                  <DialogFooter>
+                    <Button type="submit" disabled={editSaving}>
+                      {editSaving ? "Menyimpan..." : "Simpan Koreksi"}
+                    </Button>
+                  </DialogFooter>
+                </FieldGroup>
+              </form>
+            </>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

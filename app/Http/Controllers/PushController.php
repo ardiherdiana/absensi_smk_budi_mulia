@@ -5,7 +5,6 @@ namespace App\Http\Controllers;
 use App\Services\PushService;
 use Illuminate\Http\Request;
 
-// Mirrors backend/src/modules/push/push.routes.ts.
 class PushController extends Controller
 {
     public function __construct(private PushService $push) {}

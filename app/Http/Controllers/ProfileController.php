@@ -9,12 +9,6 @@ use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Inertia\Inertia;
 
-// Own-account self-service: password change works for every role, photo
-// upload only for GURU/KEPSEK (they're the only ones with a `guru` record
-// to attach a photo to) - mirrors backend/src/modules/guru/guru.routes.ts's
-// "/me" endpoints plus backend/src/modules/auth/auth.service.ts's
-// changePassword. Lives at the root namespace like DashboardController,
-// not under Guru\, since ADMIN uses it too now.
 class ProfileController extends Controller
 {
     public function __construct(private GuruService $guruService) {}

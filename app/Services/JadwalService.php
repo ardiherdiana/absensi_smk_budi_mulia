@@ -6,13 +6,8 @@ use App\Models\JadwalHari;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
 
-// Mirrors backend/src/modules/jadwal/jadwal.service.ts exactly, including
-// the self-healing backfill (a deploy that skips migration data or a
-// partially-populated table shouldn't crash the schedule page or check-in).
 class JadwalService
 {
-    // Senin(1)..Minggu(0) display order, matching how a weekly schedule is
-    // normally read - `hari` itself follows Carbon::dayOfWeek (0=Minggu).
     const DISPLAY_ORDER = [1, 2, 3, 4, 5, 6, 0];
 
     private static function defaultAktifForHari(int $hari): bool

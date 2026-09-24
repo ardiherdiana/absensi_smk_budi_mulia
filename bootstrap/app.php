@@ -3,6 +3,7 @@
 use App\Http\Middleware\HandleInertiaRequests;
 use App\Http\Middleware\PreventBackHistoryCache;
 use App\Http\Middleware\RequireRole;
+use App\Http\Middleware\Sppd\RoleMiddleware as SppdRoleMiddleware;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
@@ -24,13 +25,10 @@ return Application::configure(basePath: dirname(__DIR__))
 
         $middleware->alias([
             'role' => RequireRole::class,
+            'sppd.role' => SppdRoleMiddleware::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
-        // Inertia renders its own error pages via the shared "errors" prop
-        // (see HandleInertiaRequests) instead of Laravel's JSON/HTML error
-        // responses - only XHR/JSON callers (the small polling/scan
-        // endpoints) get raw JSON.
         $exceptions->shouldRenderJsonWhen(
             fn (Request $request) => $request->expectsJson() && ! $request->header('X-Inertia'),
         );
@@ -44,12 +42,6 @@ return Application::configure(basePath: dirname(__DIR__))
             }
         });
 
-        // Every Service class throws business-rule violations via abort($status,
-        // $message) (mirroring the original's HttpError) - Inertia only knows
-        // how to surface ValidationException (422 + errors) into a form's
-        // `errors`, so on an Inertia request/visit, re-shape any 4xx abort()
-        // into that same session-flashed-errors mechanism instead of letting
-        // it fall through as Inertia's generic (non-form) error handling.
         $exceptions->render(function (HttpException $e, Request $request) {
             $status = $e->getStatusCode();
             if ($request->header('X-Inertia') && $status >= 400 && $status < 500) {

@@ -5,6 +5,12 @@ export interface AuthUser {
   username: string
   role: Role
   guru: { id: string; nama: string; fotoUrl: string | null } | null
+  // Kolom profil modul SPPD — sama-sama ada di tabel `users` bersama, dibagikan lewat
+  // HandleInertiaRequests untuk kedua modul.
+  name: string | null
+  jabatan: string | null
+  signature_path: string | null
+  is_active: boolean
 }
 
 export interface Guru {
@@ -39,6 +45,7 @@ export interface RekapRow {
   jamMasuk: string | null
   jamPulang: string | null
   status: StatusKehadiran | null
+  catatan: string | null
 }
 
 export interface GuruAttendanceDetail {
@@ -130,5 +137,5 @@ export interface BriefingRekapRow {
   nama: string
   tanggal: string
   waktu: string | null
-  status: "HADIR" | "ALPA" | null
+  status: StatusKehadiran | null
 }

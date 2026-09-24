@@ -86,9 +86,6 @@ export function GuruDashboardPage({ today, detail }: Props) {
   }, [])
 
   React.useEffect(() => {
-    // Best-effort on load - if the browser already has permission this just
-    // works silently; if not, the browser's own prompt appears and a denial
-    // just leaves the map showing the school + radius without "you are here".
     locateMe()
   }, [locateMe])
 
@@ -104,10 +101,6 @@ export function GuruDashboardPage({ today, detail }: Props) {
       toast.success(result.type === "MASUK" ? "Absen masuk berhasil" : "Absen pulang berhasil")
       router.reload({ only: ["today", "detail"] })
     } catch (err) {
-      // A rejected checkin-web request (outside radius, already absen) is a
-      // real failure - a geolocation hiccup (permission/timeout) is just
-      // something the guru needs to fix on their end, so it reads as a
-      // warning instead of a hard error.
       if (err instanceof ApiError) {
         toast.error(err.message)
       } else {

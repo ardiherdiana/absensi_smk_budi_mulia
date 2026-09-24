@@ -10,7 +10,6 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Inertia\Inertia;
 
-// Mirrors backend/src/modules/briefing/briefing.routes.ts.
 class BriefingController extends Controller
 {
     public function __construct(
@@ -40,6 +39,27 @@ class BriefingController extends Controller
         ]);
 
         return response()->json($this->briefing->checkinBriefing($validated['qrToken']));
+    }
+
+    public function manualUpsert(Request $request)
+    {
+        $validated = $request->validate([
+            'guruId' => ['required', 'string'],
+            'tanggal' => ['required', 'string'],
+            'status' => ['required', 'in:HADIR,TELAT,IZIN,SAKIT,ALPA'],
+            'waktu' => ['nullable', 'date_format:H:i'],
+            'catatan' => ['nullable', 'string'],
+        ]);
+
+        $this->briefing->manualUpsert(
+            $validated['guruId'],
+            Carbon::parse($validated['tanggal']),
+            $validated['status'],
+            $validated['waktu'] ?? null,
+            $validated['catatan'] ?? null,
+        );
+
+        return response()->json(['success' => true]);
     }
 
     public function rekap(Request $request)

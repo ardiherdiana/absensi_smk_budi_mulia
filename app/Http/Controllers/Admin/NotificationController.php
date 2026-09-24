@@ -7,11 +7,6 @@ use App\Models\Notification;
 use App\Services\NotificationService;
 use Inertia\Inertia;
 
-// Mirrors backend/src/modules/notification/notification.routes.ts. The page
-// itself is an Inertia visit; unread-count/mark-read/mark-all stay plain
-// JSON endpoints since the original does optimistic client-side updates
-// (sidebar badge polling, instant toggle-on-click) that a full Inertia
-// page reload would undermine.
 class NotificationController extends Controller
 {
     public function __construct(private NotificationService $notifications) {}

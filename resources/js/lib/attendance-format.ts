@@ -1,5 +1,7 @@
 import type { StatusKehadiran } from "./types"
 
+export const STATUS_OPTIONS: StatusKehadiran[] = ["HADIR", "TELAT", "IZIN", "SAKIT", "ALPA"]
+
 export function toDateInputValue(date: Date): string {
   const year = date.getFullYear()
   const month = String(date.getMonth() + 1).padStart(2, "0")
@@ -59,6 +61,15 @@ export function formatJam(iso: string | null): string {
     hour: "2-digit",
     minute: "2-digit",
   })
+}
+
+/** ISO datetime -> "HH:mm" (local time), for prefilling a <TimePicker>. */
+export function toTimeInputValue(iso: string | null): string {
+  if (!iso) return ""
+  const date = new Date(iso)
+  const hh = String(date.getHours()).padStart(2, "0")
+  const mm = String(date.getMinutes()).padStart(2, "0")
+  return `${hh}:${mm}`
 }
 
 export function formatTanggal(iso: string): string {
