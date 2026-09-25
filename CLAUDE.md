@@ -2,6 +2,8 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+@AGENTS.md
+
 ## Project overview
 
 **Absensi Guru** — a teacher attendance system for SMK Budi Mulia, Karawang (Indonesian vocational
@@ -12,6 +14,15 @@ messages, DB column values like `HADIR`/`TELAT`/`IZIN`/`SAKIT`/`ALPA`).
 
 Backend is Laravel; frontend is Inertia.js + React (TypeScript) — server-rendered routing with a
 React SPA feel, no separate REST API layer for pages.
+
+The same repo and the same database (`absensi_laravel`) also host two other parts: the **SPPD module**
+(surat perintah perjalanan dinas: `/sppd/*` routes, `App\...\Sppd` namespaces, see "Shared database (SPPD)"
+below) and the **SIMAK mobile API** (`/api/pguru`, `App\...\Pguru`, see "Perangkat Guru API" below). Everything
+above and below that is not labelled SPPD or Pguru describes the attendance core.
+
+Longer project docs live in `md/` (Indonesian; git-ignored, so absent from other clones): `PRD.md`,
+`ARCHITECTURE.md`, `DESIGN_SYSTEM.md`, `SECURITY.md`, `CODE_STYLE.md`, `TESTING.md`. Read the relevant one
+before changing behavior; `md/SECURITY.md` section 7 lists known security gaps that are not fixed yet.
 
 Note: the repo root also holds a top-level `LOGIN.md` left over from an earlier Node/NestJS+Prisma
 prototype of this app — it references `backend/prisma/seed.ts`, which no longer exists in this
@@ -48,9 +59,12 @@ There is no frontend test runner (no vitest/jest) — `npm run lint` and the `ts
 
 ## Architecture
 
-### Data model conventions (non-standard for Laravel — apply everywhere)
+### Data model conventions (non-standard for Laravel — attendance core and `Pguru`)
 
-Every model in `app/Models` deviates from Laravel defaults the same way:
+Every attendance-core model in `app/Models` (and everything under `Models/Pguru`) deviates from Laravel
+defaults the same way. The SPPD models under `Models/Sppd` are the exception: they use auto-increment `id`,
+snake_case columns and `created_at`/`updated_at`, with user-reference columns kept as `string(191)` to match
+`users.id`. Don't mix the two styles inside one module.
 
 - **String ULID primary keys**, not auto-increment ints: `public $incrementing = false`,
   `protected $keyType = 'string'`, and an `id` assigned via `Str::ulid()` in a `static::creating`
@@ -153,6 +167,12 @@ Two independent, non-composable seeders — never run both against the same DB:
 
 ## Shared database (SPPD)
 
+> **Update 2026-09-24:** the standalone `../sppd` folder was deleted from this laptop (it was not a git
+> repo). SPPD now lives only in this repo as a module (commit `add sppd module`: `App\Http\Controllers\Sppd`,
+> `/sppd` routes, `resources/js/pages/sppd`, `*_sppd_*` migrations). The paragraphs below that tell you to work
+> from the sppd project or mirror migrations into its local copy are history and can no longer be followed;
+> write SPPD schema changes here.
+
 This app's database (`absensi_laravel`) is also used by a second, separate Laravel app — `sppd`
 (`../sppd`, Surat Perintah Perjalanan Dinas) — merged in 2026-09-23 so both apps run on one MySQL
 database instead of two. **This app owns `users` and its own tables.** SPPD owns its own domain
@@ -191,3 +211,45 @@ would drop every table in this shared database, not just SPPD's.
   `sppd` database (31 users, their spatie roles, and all SPPD domain rows), remapping SPPD's old
   auto-increment user ids to absensi's ULIDs by matching `username`. That database is no longer
   used by either app but hasn't been dropped.
+
+## Perangkat Guru API (`/api/pguru`)
+
+REST API untuk aplikasi mobile Expo SIMAK, dulu "Perangkat Guru" (repo terpisah: `../perangkat-guru`): guru menginput
+nilai siswa dan lembar supervisi, lalu mengekspornya ke xlsx/docx/PDF. Terdaftar lewat `routes/api.php`
+(`withRouting(api: ...)` di `bootstrap/app.php`), autentikasi token Sanctum.
+
+- **Login memakai `users` (username + kata sandi yang sama dengan web absensi/SPPD).** Tidak ada tabel akun sendiri,
+  **tidak ada pendaftaran, verifikasi email, admin API, maupun `pguru:admin`** (semua dihapus 2026-09-25; akun dibuat,
+  dinonaktifkan, dan diganti kata sandinya lewat web absensi). `POST /api/pguru/auth/login` (`Pguru\AuthService::masuk`)
+  membuat token Sanctum `mobile` untuk `App\Models\User` (`HasApiTokens`); guard `pguru` (`config/auth.php`, driver
+  sanctum, provider `users`). `config/sanctum.php`: `guard => []` dan `routes => false` sengaja, supaya cookie sesi
+  absensi tidak bisa lolos di API ini. `AuthService::alasanDitolak` = satu-satunya aturan akses, dipakai saat login
+  **dan** per permintaan oleh middleware `pguru.aktif`: `role` harus ADMIN/GURU/KEPSEK (staf SPPD tanpa role ditolak),
+  `is_active` benar, dan untuk GURU/KEPSEK profil guru `aktif` (sama dengan login web). Ditolak = 403 dengan pesan
+  Indonesia; login gagal = 401 "Username atau kata sandi salah" (sama untuk username tak dikenal dan sandi salah),
+  5 gagal per username+IP mengunci (429). Respons akun: `{id, name, username, role}` (`Support/Pguru/AkunApi`;
+  `name` jatuh ke nama guru lalu username).
+  Semua tabel modul berawalan `pguru_` (`kelas`, `siswa`, `nilai`, `supervisi`); gaya kolom sama dengan absensi (ULID
+  `string(191)`, camelCase, `createdAt/updatedAt`). `pguru_kelas.akunId` dan `pguru_supervisi.akunId` adalah kunci
+  asing ke `users.id` (`ON DELETE CASCADE`: **menghapus user menghapus seluruh data nilai/supervisinya**; menonaktifkan
+  tidak). `personal_access_tokens` (Sanctum) memakai `tokenable_id` string. Migrasi `2026_09_25_090000_pguru_pakai_akun_users`
+  memindahkan FK dan menghapus `pguru_akun`; ia **berhenti dengan galat** bila ada baris kelas/supervisi yang `akunId`-nya
+  tidak ada di `users` (data akun SIMAK lama harus dipetakan/dibuang dulu oleh pemilik).
+- **Kode berada di namespace `Pguru`**: `Http/Controllers/Pguru`, `Http/Middleware/Pguru` (alias `pguru.aktif`),
+  `Models/Pguru`, `Services/Pguru`, `Support/Pguru`. Rute data ada di grup `auth:pguru` + `pguru.aktif`; semua query
+  dibatasi `akunId` pemilik (= `users.id`; 404, bukan 403, untuk data milik akun lain).
+- **Tes memakai `PguruTestCase::akun()`** (User + `is_active` eksplisit `true`, karena pabrik tidak mengisinya) dan
+  `sebagai($user)` (`Sanctum::actingAs($user, ['*'], 'pguru')`). Env `PGURU_MAIL_*` dan `RESEND_API_KEY` tidak dipakai
+  lagi oleh modul ini (boleh dibuang dari `.env` produksi).
+- **Export memakai template asli**, bukan dibuat ulang: `resources/pguru/format-nilai-siswa.xlsx` (PhpSpreadsheet)
+  dan `format-supervisi-guru.docx` (sunting `word/document.xml` langsung, `SupervisiDocxExporter`). Penyimpangan
+  yang disengaja dari template: judul kelompok "Nilai Praktik 1" -> "Nilai Praktik", kolom Q-X dilebarkan sama
+  dengan O-P (judulnya terpotong di template), satu tab footer dibuang agar "Karawang, <tanggal>" tidak
+  membungkus, dan metadata pembuat file diganti. Nama siswa selalu ditulis sebagai string (bukan rumus).
+- **PDF tidak lewat LibreOffice** (hosting produksi tidak menyediakannya): lembar nilai digambar langsung di
+  canvas dompdf (`NilaiPdfRenderer`, memori ~14 MB untuk 273 baris; lewat HTML butuh ~150 MB), lembar supervisi
+  lewat Blade `pdf/pguru/supervisi` + dompdf. Kalau template diubah, perbarui juga renderer/view itu.
+- **Import** (`POST /api/pguru/import/siswa`) membaca berkas berformat template (NO, NAMA SISWA, KELAS, opsional
+  nilai D-M dan O-X); hasil export bisa diimpor kembali.
+- Tes: `tests/Feature/Pguru/*` (memakai template asli sebagai data uji). Validasi mengembalikan HTTP 400 dengan
+  pesan Indonesia (kunci pesan inline ada di `PguruController::validasi`, karena absensi tidak punya `lang/id`).

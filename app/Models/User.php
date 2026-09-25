@@ -15,13 +15,15 @@ use Illuminate\Database\Eloquent\Relations\MorphMany;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Illuminate\Support\Str;
+use Laravel\Sanctum\HasApiTokens;
 use Spatie\Permission\Traits\HasRoles;
 
 #[Fillable(['username', 'password', 'role', 'name', 'jabatan', 'is_active', 'signature_path'])]
 #[Hidden(['password', 'remember_token'])]
 class User extends Authenticatable
 {
-    use HasFactory, HasRoles, Notifiable;
+    // HasApiTokens: token Sanctum untuk aplikasi mobile SIMAK (guard `pguru`); login web tetap memakai sesi.
+    use HasApiTokens, HasFactory, HasRoles, Notifiable;
 
     public $incrementing = false;
 

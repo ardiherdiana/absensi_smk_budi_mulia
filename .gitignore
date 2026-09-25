@@ -13,9 +13,18 @@
 /auth.json
 /storage/*.key
 
+# Kunci privat & sertifikat penandatanganan (mis. keystore, VAPID/TLS yang
+# diekspor ke file). Kunci web push dan TTE hidup di .env, bukan di repo.
+*.pem
+*.p8
+*.p12
+*.pfx
+*.jks
+
 # Setting/instruksi lokal Claude Code (bisa berisi override permission/token
-# MCP yang sifatnya personal per-mesin).
+# MCP yang sifatnya personal per-mesin), termasuk worktree sementara.
 /.claude/settings.local.json
+/.claude/worktrees/
 /CLAUDE.local.md
 
 # ---------------------------------------------------------------------------
@@ -61,12 +70,44 @@
 
 # Dump database production asli (mis. production.sql yang dipakai
 # ProductionSyncSeeder) - berisi data nama/no hp/hash password sungguhan,
-# jangan pernah commit.
+# jangan pernah commit. Termasuk dump yang diletakkan di akar repo dan
+# versi terkompresnya (.sql.gz, .sql.zip).
 /database/seeders/data/*.sql
+/database/seeders/data/*.sql.*
+/*.sql
+/*.sql.*
+
+# ---------------------------------------------------------------------------
+# Arsip & paket unggahan
+# ---------------------------------------------------------------------------
+
+# Paket zip untuk diunggah ke hosting (mis. app.zip) berisi seluruh
+# vendor/, dan bisa ikut membawa dump database atau file sqlite di atas.
+# Dibuat ulang tiap rilis, jangan di-commit.
+/*.zip
+/*.rar
+/*.7z
+/*.tar
+/*.tar.gz
+/*.tgz
+
+# ---------------------------------------------------------------------------
+# Catatan & dokumen kerja pribadi
+# ---------------------------------------------------------------------------
 
 # Catatan/dokumen kerja pribadi (LOGIN.md, RENCANA_MAGANG.md, dst) - bukan
-# bagian dari aplikasi, jangan ikut commit.
+# bagian dari aplikasi, jangan ikut commit. Folder md/ berisi dokumen
+# proyek (PRD, arsitektur, keamanan, dst) untuk pemilik dan asisten;
+# hapus baris /md di bawah kalau ingin dokumen itu ikut versi git.
 /md
+/LOGIN.md
+
+# Laporan magang beserta PDF referensi pihak ketiga (belasan MB).
+/laporan
+
+# Berkas kunci sementara Word/Excel (~$nama.docx). Templat resmi di
+# resources/pguru/ sering dibuka di Office, dan kuncinya bisa ikut ter-add.
+~$*
 
 # ---------------------------------------------------------------------------
 # Testing, editor, & OS
@@ -90,3 +131,6 @@ Homestead.yaml
 
 .DS_Store
 Thumbs.db
+desktop.ini
+*.swp
+*.swo
