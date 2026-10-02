@@ -1,4 +1,5 @@
 import { DataPagination } from '@/components/sppd/data-pagination';
+import { useConfirm } from '@/hooks/use-confirm';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {
@@ -34,17 +35,25 @@ interface Props extends SppdPageProps {
 
 export default function Index() {
     const { items, roles } = usePage<Props>().props;
+    const { confirm, confirmDialog } = useConfirm();
 
     const roleLabel = (name: string) => roles.find((r) => r.value === name)?.label ?? name;
 
-    const hapus = (pegawai: Pegawai) => {
-        if (!window.confirm(`Hapus akun "${pegawai.name}"?`)) return;
+    const hapus = async (pegawai: Pegawai) => {
+        const ok = await confirm({
+            title: `Hapus akun "${pegawai.name}"?`,
+            description: 'Akun ini tidak bisa lagi dipakai masuk.',
+            confirmLabel: 'Hapus',
+            destructive: true,
+        });
+        if (!ok) return;
         router.delete(route('sppd.pegawai.destroy', pegawai.id), { preserveScroll: true });
     };
 
     return (
         <>
             <Head title="Data Pegawai" />
+            {confirmDialog}
 
             <div className="flex flex-col gap-4">
                 <div className="flex flex-wrap items-center justify-between gap-3">

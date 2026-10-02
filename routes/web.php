@@ -23,8 +23,6 @@ use App\Http\Controllers\Sppd\NotificationController as SppdNotificationControll
 use App\Http\Controllers\Sppd\PegawaiController as SppdPegawaiController;
 use App\Http\Controllers\Sppd\PengajuanSppdController;
 use App\Http\Controllers\Sppd\SignatureController as SppdSignatureController;
-use App\Http\Controllers\Sppd\TemplateSppdController;
-use App\Http\Controllers\Sppd\VerifikasiTteController;
 use App\Http\Controllers\UploadController;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Route;
@@ -34,7 +32,8 @@ Route::get('/', function () {
     return redirect(Auth::check() ? '/menu-utama' : '/login');
 });
 
-Route::get('/uploads/{path}', [UploadController::class, 'show'])->where('path', '.*');
+// Foto guru, lampiran izin, surat undangan, tanda tangan, dan foto laporan perjalanan: hanya untuk pengguna yang login.
+Route::get('/uploads/{path}', [UploadController::class, 'show'])->where('path', '.*')->middleware('auth');
 
 Route::get('/login', [LoginController::class, 'create'])->name('login')->middleware('guest');
 
@@ -98,8 +97,10 @@ Route::middleware(['auth', 'role:ADMIN,KEPSEK'])->group(function () {
 Route::middleware(['auth', 'role:ADMIN,GURU,KEPSEK'])->group(function () {
     Route::get('/profil', [ProfileController::class, 'edit']);
     Route::post('/profil/foto', [ProfileController::class, 'uploadFoto']);
-    Route::post('/profil/password', [ProfileController::class, 'changePassword']);
 });
+
+// Ganti password boleh untuk semua akun yang login, termasuk staf yang hanya memakai SPPD (tanpa peran absensi).
+Route::post('/profil/password', [ProfileController::class, 'changePassword'])->middleware('auth');
 
 Route::middleware(['auth', 'role:GURU,KEPSEK'])->group(function () {
     Route::get('/qr', [QrController::class, 'index']);
@@ -116,14 +117,9 @@ Route::middleware(['auth', 'role:GURU,KEPSEK'])->group(function () {
 // (pemohon, kepala_sekolah, tu, bendahara), lapis di atas role absensi (ADMIN/GURU/KEPSEK).
 // Akun ADMIN lolos semua gate di bawah ini (lihat App\Models\User::isAdmin()).
 
-// Verifikasi TTE — publik (dipindai dari QR pada SPPD), dibatasi laju untuk mencegah penebakan kode.
-Route::get('/sppd/verifikasi/{kode}', [VerifikasiTteController::class, 'show'])
-    ->where('kode', '[A-Za-z0-9]{32}')
-    ->middleware('throttle:30,1')
-    ->name('sppd.tte.verifikasi');
-
 Route::prefix('sppd')->name('sppd.')->middleware('auth')->group(function () {
     Route::get('/dashboard', SppdDashboardController::class)->name('dashboard');
+    Route::get('/profil', [ProfileController::class, 'editSppd'])->name('profil');
 
     Route::get('/notifikasi', [SppdNotificationController::class, 'index'])->name('notifications.index');
     Route::patch('/notifikasi/read-all', [SppdNotificationController::class, 'markAllRead'])->name('notifications.read-all');
@@ -140,7 +136,7 @@ Route::prefix('sppd')->name('sppd.')->middleware('auth')->group(function () {
     Route::middleware('sppd.role:'.SppdRoleName::Pemohon->value)->group(function () {
         Route::get('/pengajuan-create', [PengajuanSppdController::class, 'create'])->name('pengajuan.create');
         Route::post('/pengajuan', [PengajuanSppdController::class, 'store'])->name('pengajuan.store');
-        Route::post('/pengajuan/{pengajuan}/kedatangan', [PengajuanSppdController::class, 'konfirmasiKedatangan'])->name('pengajuan.kedatangan');
+        Route::post('/pengajuan/{pengajuan}/laporan', [PengajuanSppdController::class, 'simpanLaporan'])->name('pengajuan.laporan');
     });
 
     // Kepala Sekolah
@@ -155,10 +151,6 @@ Route::prefix('sppd')->name('sppd.')->middleware('auth')->group(function () {
     Route::middleware('sppd.role:'.SppdRoleName::Tu->value)->group(function () {
         Route::post('/pengajuan/{pengajuan}/terbitkan-sppd', [PengajuanSppdController::class, 'terbitkanSppd'])->name('pengajuan.terbitkan-sppd');
         Route::post('/pengajuan/{pengajuan}/selesai', [PengajuanSppdController::class, 'selesaikan'])->name('pengajuan.selesai');
-
-        Route::get('/pengaturan/template-sppd', [TemplateSppdController::class, 'edit'])->name('template-sppd.edit');
-        Route::put('/pengaturan/template-sppd', [TemplateSppdController::class, 'update'])->name('template-sppd.update');
-        Route::get('/pengaturan/template-sppd/pratinjau/{template}', [TemplateSppdController::class, 'pratinjau'])->name('template-sppd.pratinjau');
 
         Route::get('/pegawai', [SppdPegawaiController::class, 'index'])->name('pegawai.index');
         Route::get('/pegawai/create', [SppdPegawaiController::class, 'create'])->name('pegawai.create');

@@ -38,7 +38,7 @@ class PengajuanSppdPolicy
         return $user->hasRole(RoleName::Tu->value) && $pengajuanSppd->status === PengajuanStatus::DisetujuiKepsek;
     }
 
-    public function konfirmasiKedatangan(User $user, PengajuanSppd $pengajuanSppd): bool
+    public function isiLaporan(User $user, PengajuanSppd $pengajuanSppd): bool
     {
         return $user->id === $pengajuanSppd->pemohon_id && $pengajuanSppd->status === PengajuanStatus::SedangDitugaskan;
     }

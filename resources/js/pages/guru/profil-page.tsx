@@ -6,7 +6,7 @@ import { Camera } from "lucide-react"
 import { useAuth } from "@/context/auth-context"
 import { assetUrl } from "@/lib/api"
 import { initials } from "@/lib/utils"
-import { LogoutButton } from "@/components/logout-button"
+import { ProfilRingkasan } from "@/components/profil-ringkasan"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -73,11 +73,18 @@ export function GuruProfilPage() {
   }
 
   return (
-    <div className="flex max-w-lg flex-col gap-6">
+    <div className="flex flex-col gap-6">
       <div>
         <h1 className="text-xl font-semibold">Profil Saya</h1>
-        <p className="text-sm text-muted-foreground">Kelola foto profil dan password akun Anda</p>
+        <p className="text-sm text-muted-foreground">Lihat data akun, kehadiran bulan ini, serta kelola foto profil dan password</p>
       </div>
+
+      <div className="grid items-start gap-6 lg:grid-cols-2">
+        <div className="flex flex-col gap-6">
+          <ProfilRingkasan />
+        </div>
+
+        <div className="flex flex-col gap-6">
 
       <Card>
         <CardHeader>
@@ -178,7 +185,8 @@ export function GuruProfilPage() {
         </CardContent>
       </Card>
 
-      <LogoutButton />
+        </div>
+      </div>
     </div>
   )
 }

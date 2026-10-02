@@ -5,7 +5,6 @@ namespace App\Models\Sppd;
 use App\Enums\Sppd\PengajuanStatus;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
-use Illuminate\Database\Eloquent\Attributes\Hidden;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -18,9 +17,8 @@ use Illuminate\Database\Eloquent\Relations\HasOne;
     'tanggal_berangkat', 'jam_berangkat', 'tanggal_kembali', 'jam_kembali',
     'status', 'undangan_path',
     'catatan_kepsek', 'disetujui_oleh', 'disetujui_at', 'tanda_tangan_kepsek_path',
-    'tte_kode', 'tte_signature', 'tte_versi', 'ditolak_at',
+    'ditolak_at',
 ])]
-#[Hidden(['tte_signature'])]
 class PengajuanSppd extends Model
 {
     use HasFactory;
@@ -61,11 +59,13 @@ class PengajuanSppd extends Model
     }
 
     /**
-     * @return HasOne<KonfirmasiKedatangan, $this>
+     * Laporan perjalanan (rangkuman hasil dinas beserta foto dokumentasi) yang diisi pemohon.
+     *
+     * @return HasOne<LaporanPerjalanan, $this>
      */
-    public function kedatangan(): HasOne
+    public function laporan(): HasOne
     {
-        return $this->hasOne(KonfirmasiKedatangan::class, 'pengajuan_id');
+        return $this->hasOne(LaporanPerjalanan::class, 'pengajuan_id');
     }
 
     /**

@@ -1,13 +1,14 @@
 import * as React from 'react';
-import { Link, usePage } from '@inertiajs/react';
+import { Link, router, usePage } from '@inertiajs/react';
 import {
     BellIcon,
     ClipboardListIcon,
     FileClockIcon,
     HomeIcon,
     LayoutDashboardIcon,
-    LayoutTemplateIcon,
+    LogOutIcon,
     PenLineIcon,
+    UserRoundIcon,
     UsersIcon,
 } from 'lucide-react';
 
@@ -61,6 +62,7 @@ export function SppdSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) 
 
     const sistem: NavItem[] = [
         { title: 'Notifikasi', url: path('sppd.notifications.index'), icon: BellIcon, badge: notifications.unreadCount },
+        { title: 'Profil', url: path('sppd.profil'), icon: UserRoundIcon },
     ];
 
     if (isAdmin || roles.some((r) => ['kepala_sekolah', 'tu', 'bendahara'].includes(r))) {
@@ -81,7 +83,6 @@ export function SppdSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) 
             label: 'Tata Usaha',
             items: [
                 { title: 'Data Pegawai', url: path('sppd.pegawai.index'), icon: UsersIcon },
-                { title: 'Template SPPD', url: path('sppd.template-sppd.edit'), icon: LayoutTemplateIcon },
             ],
         });
     }
@@ -147,6 +148,12 @@ export function SppdSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) 
                         <div className="flex items-center justify-between gap-2 px-2 py-1.5 text-sm">
                             <span className="truncate font-medium">{isAdmin ? 'Admin' : auth.user?.name}</span>
                         </div>
+                    </SidebarMenuItem>
+                    <SidebarMenuItem>
+                        <SidebarMenuButton onClick={() => router.post('/logout')}>
+                            <LogOutIcon />
+                            Keluar
+                        </SidebarMenuButton>
                     </SidebarMenuItem>
                 </SidebarMenu>
             </SidebarFooter>

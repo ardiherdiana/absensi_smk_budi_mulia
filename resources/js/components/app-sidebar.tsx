@@ -11,6 +11,7 @@ import {
   QrCode,
   ScanLine,
   Settings,
+  UserRound,
   Users,
 } from "lucide-react"
 
@@ -45,6 +46,8 @@ interface NavGroup {
   items: NavItem[]
 }
 
+const PROFIL_ITEM: NavItem = { title: "Profil", url: "/profil", icon: UserRound }
+
 const adminNav: NavGroup[] = [
   {
     label: "Menu",
@@ -74,6 +77,7 @@ const adminNav: NavGroup[] = [
     items: [
       { title: "Notifikasi", url: NOTIFIKASI_URL, icon: Bell },
       { title: "Pengaturan", url: "/pengaturan", icon: Settings },
+      PROFIL_ITEM,
     ],
   },
 ]
@@ -89,6 +93,7 @@ const guruNav: NavGroup[] = [
       { title: "Izin & Sakit", url: "/izin", icon: FileText },
     ],
   },
+  { label: "Sistem", items: [PROFIL_ITEM] },
 ]
 
 const kepsekNav: NavGroup[] = [
@@ -109,8 +114,14 @@ const kepsekNav: NavGroup[] = [
       { title: "Rekap Absensi", url: "/rekap", icon: ClipboardList },
       { title: "Approve Izin & Sakit", url: "/persetujuan", icon: FileText },
       { title: "Hari Libur", url: "/hari-libur", icon: CalendarOff },
+    ],
+  },
+  {
+    label: "Sistem",
+    items: [
       { title: "Notifikasi", url: NOTIFIKASI_URL, icon: Bell },
       { title: "Pengaturan", url: "/pengaturan", icon: Settings },
+      PROFIL_ITEM,
     ],
   },
 ]

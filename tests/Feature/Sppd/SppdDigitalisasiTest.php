@@ -4,11 +4,9 @@ namespace Tests\Feature\Sppd;
 
 use App\Enums\Sppd\PengajuanStatus;
 use App\Enums\Sppd\RoleName;
-use App\Models\Sppd\KonfirmasiKedatangan;
 use App\Models\Sppd\LogAudit;
 use App\Models\Sppd\PengajuanSppd;
 use App\Models\User;
-use App\Services\Sppd\TandaTanganElektronik;
 use Database\Seeders\RoleSeeder;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
@@ -17,6 +15,9 @@ use Tests\TestCase;
 
 class SppdDigitalisasiTest extends TestCase
 {
+    /** JPEG 1x1 piksel; GD tidak selalu terpasang di mesin tes, jadi tidak memakai UploadedFile::image(). */
+    private const JPEG_1X1 = '/9j/4AAQSkZJRgABAQEASABIAAD/2wBDAP//////////////////////////////////////////////////////////////////////////////////////wgALCAABAAEBAREA/8QAFBABAAAAAAAAAAAAAAAAAAAAAP/aAAgBAQABPxA=';
+
     private User $pemohon;
 
     private User $kepsek;
@@ -83,20 +84,21 @@ class SppdDigitalisasiTest extends TestCase
         $this->actingAs($this->kepsek)->post(route('sppd.pengajuan.approve', $pengajuan), [])->assertSessionHasNoErrors();
         $this->actingAs($this->tu)->post(route('sppd.pengajuan.terbitkan-sppd', $pengajuan), ['akun_anggaran' => $akun])->assertSessionHasNoErrors();
 
-        return $pengajuan->fresh(['pemohon', 'penyetuju', 'sppd', 'pengikuts', 'kedatangan']);
+        return $pengajuan->fresh(['pemohon', 'penyetuju', 'sppd', 'pengikuts']);
     }
 
     /**
-     * @return array<string, string>
+     * @return array<string, mixed>
      */
-    private function dataKedatangan(PengajuanSppd $pengajuan): array
+    private function dataLaporan(array $overrides = []): array
     {
-        return [
-            'pejabat_nama' => 'Dr. Ahmad Fauzi',
-            'pejabat_jabatan' => 'Kepala Bagian Umum',
-            'tiba_tanggal' => $pengajuan->tanggal_berangkat->toDateString(),
-            'berangkat_tanggal' => $pengajuan->tanggal_kembali->toDateString(),
-        ];
+        return array_merge([
+            'ringkasan' => 'Membahas kurikulum merdeka dan menyepakati tindak lanjut untuk sekolah.',
+            'fotos' => [
+                UploadedFile::fake()->createWithContent('a.jpg', base64_decode(self::JPEG_1X1)),
+                UploadedFile::fake()->createWithContent('b.jpg', base64_decode(self::JPEG_1X1)),
+            ],
+        ], $overrides);
     }
 
     public function test_pengajuan_stores_alat_angkutan_keterangan_and_pengikut(): void
@@ -186,123 +188,128 @@ class SppdDigitalisasiTest extends TestCase
         $this->assertStringNotContainsString('........', $html, 'titik-titik bagian I/II tidak boleh dicetak');
     }
 
-    public function test_tte_covers_the_new_fields(): void
-    {
-        $tte = app(TandaTanganElektronik::class);
-        $rekan = $this->rekan();
-        $pengajuan = $this->setujuiDanTerbitkan($this->ajukan(['pengikut_ids' => [$rekan->id]]));
-
-        $this->assertSame(TandaTanganElektronik::VERSI, $pengajuan->tte_versi);
-        $this->assertTrue($tte->valid($pengajuan));
-
-        $pengajuan->forceFill(['alat_angkutan' => 'Mobil dinas'])->save();
-        $this->assertFalse($tte->valid($pengajuan->fresh()));
-
-        $pengajuan->forceFill(['alat_angkutan' => 'Sepeda motor pribadi'])->save();
-        $this->assertTrue($tte->valid($pengajuan->fresh()));
-
-        $pengajuan->pengikuts()->detach();
-        $this->assertFalse($tte->valid($pengajuan->fresh()), 'pengikut diubah setelah disetujui');
-    }
-
-    public function test_legacy_v1_tte_still_verifies(): void
-    {
-        $tte = app(TandaTanganElektronik::class);
-        $pengajuan = $this->setujuiDanTerbitkan($this->ajukan());
-
-        $pengajuan->forceFill(['tte_versi' => 1])->save();
-        $pengajuan->forceFill(['tte_signature' => $tte->tandatangani($pengajuan->fresh())])->save();
-
-        $this->assertTrue($tte->valid($pengajuan->fresh()));
-    }
-
-    public function test_pemohon_confirms_arrival_and_pdf_shows_the_receiving_official(): void
+    public function test_pdf_has_no_tte_qr_nor_arrival_confirmation_and_leaves_destination_fields_blank(): void
     {
         $pengajuan = $this->setujuiDanTerbitkan($this->ajukan());
 
-        $this->actingAs($this->pemohon)->post(route('sppd.pengajuan.kedatangan', $pengajuan), $this->dataKedatangan($pengajuan) + [
-            'bukti' => UploadedFile::fake()->create('bukti.pdf', 80, 'application/pdf'),
-        ])->assertSessionHasNoErrors();
+        $html = view('pdf.sppd', ['pengajuan' => $pengajuan])->render();
 
-        $kedatangan = $pengajuan->fresh()->kedatangan;
-        $this->assertSame('Dr. Ahmad Fauzi', $kedatangan->pejabat_nama);
-        Storage::disk('public')->assertExists($kedatangan->bukti_path);
-        $this->assertTrue(LogAudit::where('entitas_id', $pengajuan->id)->where('aksi', 'like', '%Dr. Ahmad Fauzi%')->exists());
-        $this->assertSame(1, $this->tu->notifications()->where('data->pesan', 'Pemohon telah mengonfirmasi kedatangan di tempat tujuan.')->count());
-
-        $html = view('pdf.sppd', ['pengajuan' => $pengajuan->fresh(['pemohon', 'penyetuju', 'sppd', 'pengikuts', 'kedatangan'])])->render();
-        $this->assertStringContainsString('Dr. Ahmad Fauzi', $html);
-        $this->assertStringContainsString('Kepala Bagian Umum', $html);
-        $this->assertStringContainsString('Dikonfirmasi elektronik', $html);
+        $this->assertStringNotContainsString('data:image/svg+xml', $html);
+        $this->assertStringNotContainsString('ditandatangani elektronik', $html);
+        $this->assertStringNotContainsString('Dikonfirmasi elektronik', $html);
+        $this->assertStringNotContainsString('/sppd/verifikasi/', $html);
     }
 
-    public function test_arrival_confirmation_can_be_updated_and_replaces_the_old_proof(): void
+    public function test_tte_verification_route_and_arrival_confirmation_route_are_gone(): void
     {
         $pengajuan = $this->setujuiDanTerbitkan($this->ajukan());
-        $data = $this->dataKedatangan($pengajuan);
 
-        $this->actingAs($this->pemohon)->post(route('sppd.pengajuan.kedatangan', $pengajuan), $data + ['bukti' => UploadedFile::fake()->create('a.pdf', 10, 'application/pdf')]);
-        $pertama = $pengajuan->fresh()->kedatangan->bukti_path;
+        $this->get('/sppd/verifikasi/'.str_repeat('a', 32))->assertNotFound();
+        $this->actingAs($this->pemohon)->post('/sppd/pengajuan/'.$pengajuan->id.'/kedatangan', [])->assertNotFound();
+    }
 
-        $this->actingAs($this->pemohon)->post(route('sppd.pengajuan.kedatangan', $pengajuan), ['pejabat_nama' => 'Dra. Siti'] + $data + ['bukti' => UploadedFile::fake()->create('b.pdf', 10, 'application/pdf')])
+    public function test_pemohon_fills_trip_report_with_summary_and_photos(): void
+    {
+        $pengajuan = $this->setujuiDanTerbitkan($this->ajukan());
+
+        $this->actingAs($this->pemohon)->post(route('sppd.pengajuan.laporan', $pengajuan), $this->dataLaporan())
             ->assertSessionHasNoErrors();
 
-        $kedatangan = $pengajuan->fresh()->kedatangan;
-        $this->assertSame(1, KonfirmasiKedatangan::count());
-        $this->assertSame('Dra. Siti', $kedatangan->pejabat_nama);
-        $this->assertNotSame($pertama, $kedatangan->bukti_path);
-        Storage::disk('public')->assertMissing($pertama);
-        Storage::disk('public')->assertExists($kedatangan->bukti_path);
+        $laporan = $pengajuan->fresh()->laporan;
+        $this->assertStringContainsString('kurikulum merdeka', $laporan->ringkasan);
+        $this->assertSame($this->pemohon->id, $laporan->ditulis_oleh);
+        $this->assertCount(2, $laporan->fotos);
+        $laporan->fotos->each(fn ($foto) => Storage::disk('public')->assertExists($foto->path));
+        $this->assertTrue(LogAudit::where('entitas_id', $pengajuan->id)->where('aksi', 'like', 'Laporan perjalanan diisi%')->exists());
+        $this->assertSame(1, $this->tu->notifications()->where('data->pesan', 'Pemohon telah mengisi laporan perjalanan dinas.')->count());
     }
 
-    public function test_arrival_confirmation_is_limited_to_the_owner_while_the_trip_is_ongoing(): void
+    public function test_trip_report_requires_summary_and_at_least_one_photo(): void
+    {
+        $pengajuan = $this->setujuiDanTerbitkan($this->ajukan());
+
+        $this->actingAs($this->pemohon)->post(route('sppd.pengajuan.laporan', $pengajuan), $this->dataLaporan(['ringkasan' => '']))
+            ->assertSessionHasErrors('ringkasan');
+        $this->actingAs($this->pemohon)->post(route('sppd.pengajuan.laporan', $pengajuan), $this->dataLaporan(['fotos' => []]))
+            ->assertSessionHasErrors('fotos');
+        $this->actingAs($this->pemohon)->post(route('sppd.pengajuan.laporan', $pengajuan), $this->dataLaporan([
+            'fotos' => [UploadedFile::fake()->create('dokumen.pdf', 10, 'application/pdf')],
+        ]))->assertSessionHasErrors('fotos.0');
+
+        $this->assertNull($pengajuan->fresh()->laporan);
+    }
+
+    public function test_trip_report_can_be_updated_replacing_and_removing_photos(): void
+    {
+        $pengajuan = $this->setujuiDanTerbitkan($this->ajukan());
+        $this->actingAs($this->pemohon)->post(route('sppd.pengajuan.laporan', $pengajuan), $this->dataLaporan());
+
+        [$pertama, $kedua] = $pengajuan->fresh()->laporan->fotos->all();
+
+        // Hapus foto pertama, tambah satu foto baru, ubah rangkuman: tanpa foto baru pun boleh selama masih ada sisa.
+        $this->actingAs($this->pemohon)->post(route('sppd.pengajuan.laporan', $pengajuan), [
+            'ringkasan' => 'Rangkuman revisi',
+            'hapus_foto_ids' => [$pertama->id],
+            'fotos' => [UploadedFile::fake()->createWithContent('c.jpg', base64_decode(self::JPEG_1X1))],
+        ])->assertSessionHasNoErrors();
+
+        $laporan = $pengajuan->fresh()->laporan;
+        $this->assertSame('Rangkuman revisi', $laporan->ringkasan);
+        $this->assertCount(2, $laporan->fotos);
+        $this->assertNull($laporan->fotos->firstWhere('id', $pertama->id));
+        Storage::disk('public')->assertMissing($pertama->path);
+        Storage::disk('public')->assertExists($kedua->path);
+        $this->assertSame(1, $this->tu->notifications()->where('data->pesan', 'Pemohon telah mengisi laporan perjalanan dinas.')->count(), 'notifikasi hanya saat pertama kali diisi');
+
+        $this->actingAs($this->pemohon)->post(route('sppd.pengajuan.laporan', $pengajuan), ['ringkasan' => 'Hanya teks'])
+            ->assertSessionHasNoErrors();
+
+        // Menghapus semua foto tanpa menggantinya ditolak.
+        $this->actingAs($this->pemohon)->post(route('sppd.pengajuan.laporan', $pengajuan), [
+            'ringkasan' => 'Hanya teks',
+            'hapus_foto_ids' => $pengajuan->fresh()->laporan->fotos->pluck('id')->all(),
+        ])->assertSessionHasErrors('fotos');
+        $this->assertCount(2, $pengajuan->fresh()->laporan->fotos);
+    }
+
+    public function test_trip_report_is_limited_to_the_owner_while_the_trip_is_ongoing(): void
     {
         $pengajuan = $this->ajukan();
-        $data = $this->dataKedatangan($pengajuan);
 
         // Belum disetujui / diterbitkan.
-        $this->actingAs($this->pemohon)->post(route('sppd.pengajuan.kedatangan', $pengajuan), $data)->assertForbidden();
+        $this->actingAs($this->pemohon)->post(route('sppd.pengajuan.laporan', $pengajuan), $this->dataLaporan())->assertForbidden();
 
         $pengajuan = $this->setujuiDanTerbitkan($pengajuan);
 
         $lain = User::factory()->create()->assignRole(RoleName::Pemohon->value);
-        $this->actingAs($lain)->post(route('sppd.pengajuan.kedatangan', $pengajuan), $data)->assertForbidden();
-        $this->actingAs($this->tu)->post(route('sppd.pengajuan.kedatangan', $pengajuan), $data)->assertForbidden();
-        $this->actingAs($this->kepsek)->post(route('sppd.pengajuan.kedatangan', $pengajuan), $data)->assertForbidden();
+        $this->actingAs($lain)->post(route('sppd.pengajuan.laporan', $pengajuan), $this->dataLaporan())->assertForbidden();
+        $this->actingAs($this->tu)->post(route('sppd.pengajuan.laporan', $pengajuan), $this->dataLaporan())->assertForbidden();
+        $this->actingAs($this->kepsek)->post(route('sppd.pengajuan.laporan', $pengajuan), $this->dataLaporan())->assertForbidden();
 
-        $this->actingAs($this->pemohon)->post(route('sppd.pengajuan.kedatangan', $pengajuan), $data)->assertSessionHasNoErrors();
+        $this->actingAs($this->pemohon)->post(route('sppd.pengajuan.laporan', $pengajuan), $this->dataLaporan())->assertSessionHasNoErrors();
 
         $this->actingAs($this->tu)->post(route('sppd.pengajuan.selesai', $pengajuan));
         $this->assertSame(PengajuanStatus::Selesai, $pengajuan->fresh()->status);
-        $this->actingAs($this->pemohon)->post(route('sppd.pengajuan.kedatangan', $pengajuan), $data)->assertForbidden();
+        $this->actingAs($this->pemohon)->post(route('sppd.pengajuan.laporan', $pengajuan), $this->dataLaporan())->assertForbidden();
     }
 
-    public function test_arrival_dates_are_validated(): void
-    {
-        $pengajuan = $this->setujuiDanTerbitkan($this->ajukan());
-
-        $this->actingAs($this->pemohon)->post(route('sppd.pengajuan.kedatangan', $pengajuan), [
-            'pejabat_nama' => '',
-            'pejabat_jabatan' => '',
-            'tiba_tanggal' => $pengajuan->tanggal_berangkat->copy()->subDay()->toDateString(),
-            'berangkat_tanggal' => $pengajuan->tanggal_berangkat->copy()->subDays(2)->toDateString(),
-        ])->assertSessionHasErrors(['pejabat_nama', 'pejabat_jabatan', 'tiba_tanggal', 'berangkat_tanggal']);
-
-        $this->assertNull($pengajuan->fresh()->kedatangan);
-    }
-
-    public function test_show_page_exposes_arrival_data_and_permissions(): void
+    public function test_show_page_exposes_the_report_and_permissions(): void
     {
         $pengajuan = $this->setujuiDanTerbitkan($this->ajukan());
 
         $this->actingAs($this->pemohon)->get(route('sppd.pengajuan.show', $pengajuan))
             ->assertInertia(fn (Assert $page) => $page
-                ->where('can.konfirmasiKedatangan', true)
-                ->where('kedatangan', null)
-                ->where('kedatanganDefault.tiba_tanggal', $pengajuan->tanggal_berangkat->toDateString())
-                ->where('pengajuan.alat_angkutan', 'Sepeda motor pribadi'));
+                ->where('can.isiLaporan', true)
+                ->where('laporan', null)
+                ->where('pengajuan.alat_angkutan', 'Sepeda motor pribadi')
+                ->missing('kedatangan'));
+
+        $this->actingAs($this->pemohon)->post(route('sppd.pengajuan.laporan', $pengajuan), $this->dataLaporan());
 
         $this->actingAs($this->tu)->get(route('sppd.pengajuan.show', $pengajuan))
-            ->assertInertia(fn (Assert $page) => $page->where('can.konfirmasiKedatangan', false));
+            ->assertInertia(fn (Assert $page) => $page
+                ->where('can.isiLaporan', false)
+                ->where('laporan.penulis', $this->pemohon->name)
+                ->has('laporan.fotos', 2));
     }
 }

@@ -5,7 +5,7 @@ namespace App\Services\Sppd;
 use App\Enums\Sppd\JenisPencairan;
 use App\Enums\Sppd\PengajuanStatus;
 use App\Enums\Sppd\RoleName;
-use App\Models\Sppd\KonfirmasiKedatangan;
+use App\Models\Sppd\LaporanPerjalanan;
 use App\Models\Sppd\LogAudit;
 use App\Models\Sppd\Pencairan;
 use App\Models\Sppd\PengajuanSppd;
@@ -18,10 +18,7 @@ use RuntimeException;
 
 class PengajuanWorkflowService
 {
-    public function __construct(
-        private readonly NomorSuratGenerator $nomorSuratGenerator,
-        private readonly TandaTanganElektronik $tte,
-    ) {}
+    public function __construct(private readonly NomorSuratGenerator $nomorSuratGenerator) {}
 
     public function ajukan(PengajuanSppd $pengajuan, User $pemohon): PengajuanSppd
     {
@@ -43,16 +40,10 @@ class PengajuanWorkflowService
                 'disetujui_oleh' => $kepsek->id,
                 'disetujui_at' => now(),
                 'tanda_tangan_kepsek_path' => $tandaTanganPath,
-                'tte_kode' => $this->tte->buatKode(),
-                'tte_versi' => TandaTanganElektronik::VERSI,
                 'catatan_kepsek' => $catatan,
             ]);
 
-            // Ambil ulang nilai yang benar-benar tersimpan (presisi detik) sebelum ditandatangani.
-            $pengajuan->refresh();
-            $pengajuan->update(['tte_signature' => $this->tte->tandatangani($pengajuan)]);
-
-            $this->transition($pengajuan, PengajuanStatus::DisetujuiKepsek, $kepsek, 'Pengajuan disetujui dan ditandatangani elektronik (TTE) oleh Kepala Sekolah.');
+            $this->transition($pengajuan, PengajuanStatus::DisetujuiKepsek, $kepsek, 'Pengajuan disetujui dan ditandatangani oleh Kepala Sekolah.');
         });
 
         $this->notifyRole(RoleName::Tu, $pengajuan, 'Pengajuan disetujui, silakan terbitkan SPPD.');
@@ -98,28 +89,41 @@ class PengajuanWorkflowService
     }
 
     /**
-     * Pemohon mengonfirmasi kedatangan di tujuan (mengisi kolom pejabat tujuan pada sisi belakang SPPD).
+     * Pemohon mengisi atau memperbarui laporan perjalanan: rangkuman hasil dinas dan foto dokumentasi.
+     * Foto lama yang ada di $hapusFotoIds dibuang (berkasnya ikut dihapus); $fotoBaru adalah daftar [path, nama asli]
+     * berkas yang sudah tersimpan di disk.
      *
-     * @param  array{pejabat_nama: string, pejabat_jabatan: string, tiba_tanggal: string, berangkat_tanggal: string}  $data
+     * @param  array<int, int|string>  $hapusFotoIds
+     * @param  array<int, array{path: string, nama_asli: ?string}>  $fotoBaru
      */
-    public function konfirmasiKedatangan(PengajuanSppd $pengajuan, User $pemohon, array $data, ?string $buktiPath): KonfirmasiKedatangan
+    public function simpanLaporan(PengajuanSppd $pengajuan, User $pemohon, string $ringkasan, array $hapusFotoIds, array $fotoBaru): LaporanPerjalanan
     {
-        $lama = $pengajuan->kedatangan;
+        $baru = ! $pengajuan->laporan()->exists();
 
-        $konfirmasi = $pengajuan->kedatangan()->updateOrCreate([], $data + [
-            'dikonfirmasi_oleh' => $pemohon->id,
-            'bukti_path' => $buktiPath ?? $lama?->bukti_path,
-        ]);
+        $laporan = DB::transaction(function () use ($pengajuan, $pemohon, $ringkasan, $hapusFotoIds, $fotoBaru): LaporanPerjalanan {
+            $laporan = $pengajuan->laporan()->updateOrCreate([], [
+                'ditulis_oleh' => $pemohon->id,
+                'ringkasan' => $ringkasan,
+            ]);
 
-        if ($buktiPath && $lama?->bukti_path) {
-            Storage::disk('public')->delete($lama->bukti_path);
+            $dibuang = $laporan->fotos()->whereIn('id', $hapusFotoIds)->get();
+            $dibuang->each->delete();
+            Storage::disk('public')->delete($dibuang->pluck('path')->all());
+
+            foreach ($fotoBaru as $foto) {
+                $laporan->fotos()->create($foto);
+            }
+
+            return $laporan;
+        });
+
+        $this->log($pengajuan, $pemohon, ($baru ? 'Laporan perjalanan diisi' : 'Laporan perjalanan diperbarui').' oleh pemohon ('.$laporan->fotos()->count().' foto dokumentasi).');
+
+        if ($baru) {
+            $this->notifyRole(RoleName::Tu, $pengajuan, 'Pemohon telah mengisi laporan perjalanan dinas.');
         }
 
-        $this->log($pengajuan, $pemohon, "Kedatangan di {$pengajuan->tujuan} dikonfirmasi (pejabat penerima: {$data['pejabat_nama']}, {$data['pejabat_jabatan']}).");
-
-        $this->notifyRole(RoleName::Tu, $pengajuan, 'Pemohon telah mengonfirmasi kedatangan di tempat tujuan.');
-
-        return $konfirmasi;
+        return $laporan;
     }
 
     public function cairkanUangMuka(PengajuanSppd $pengajuan, User $bendahara, float $jumlah, ?string $keterangan): Pencairan

@@ -24,16 +24,11 @@ proyek Laravel sendiri (`../simak`, basis data sendiri). Modulnya dihapus dari s
 `2026_09_26_120000_drop_pguru_tables` membuang tabel `pguru_*` dan `personal_access_tokens` (data ikut hilang di basis data
 tempat migrasi dijalankan). Kodenya masih ada di riwayat git sebelum commit penghapusan.
 
-Longer project docs live in `md/` (Indonesian; git-ignored, so absent from other clones): `PRD.md`,
-`ARCHITECTURE.md`, `DESIGN_SYSTEM.md`, `SECURITY.md`, `CODE_STYLE.md`, `TESTING.md`. Read the relevant one
-before changing behavior; `md/SECURITY.md` section 7 lists known security gaps that are not fixed yet.
-
-Note: the repo root also holds a top-level `LOGIN.md` left over from an earlier Node/NestJS+Prisma
-prototype of this app — it references `backend/prisma/seed.ts`, which no longer exists in this
-Laravel rewrite. Don't treat it as current; the real seed logic is
-`database/seeders/DatabaseSeeder.php` (see below). (This project used to live nested in a
-`laravel/` subfolder one level below the git root; it was flattened so the repo root and the
-Laravel app root are now the same directory.)
+Tidak ada folder dokumen terpisah: aturan dan konvensi proyek ada di berkas ini, `AGENTS.md`, dan `README.md`;
+sisanya baca dari kode. Folder `laporan/` (laporan magang) dan berkas pribadi lain sengaja di-`.gitignore` dan bukan
+bagian aplikasi. (Proyek ini dulu berada di subfolder `laravel/` di bawah akar git; sekarang akar repo dan akar
+aplikasi Laravel adalah folder yang sama.) Seeder dev yang sebenarnya ada di `database/seeders/DatabaseSeeder.php`
+(lihat "Seeding").
 
 ## Commands
 
@@ -106,13 +101,20 @@ break relations and casts silently.
 - `resources/js/main.tsx` eager-globs `./pages/**/*.tsx` and resolves Inertia's `Inertia::render('admin/guru-page', ...)`
   to `resources/js/pages/admin/guru-page.tsx` — the string passed to `Inertia::render` must match
   the page file path (minus extension) under `pages/`.
-- Every page is auto-wrapped in `DashboardLayout` (`resources/js/layouts/dashboard-layout.tsx`)
-  *except* the ones listed in `BARE_PAGES` in `main.tsx` (currently `login-page`, `kiosk-page`).
-  Add a new standalone/full-bleed page to `BARE_PAGES` rather than fighting the layout inside the
-  page component.
+- Every page is auto-wrapped in a layout by its name: pages under `sppd/` get `SppdLayout` (SPPD sidebar), all others get
+  `DashboardLayout` (`resources/js/layouts/dashboard-layout.tsx`, absensi sidebar) — *except* the ones listed in
+  `BARE_PAGES` in `main.tsx` (currently `login-page`, `kiosk-page`, `module-picker-page`). Add a new standalone/full-bleed
+  page to `BARE_PAGES` rather than fighting the layout inside the page component. A screen that must appear in both
+  modules needs a route and page under each prefix, otherwise the sidebar switches modules: the profile page is
+  `/profil` (`admin/profil-page`, `guru/profil-page`) for absensi and `/sppd/profil` (`sppd/profil`, reusing the same
+  components) for SPPD. Both sidebars carry *Profil* in the "Sistem" group and *Keluar* in the footer.
 - Path alias `@/` → `resources/js/` (see `vite.config.ts` / `tsconfig.json`). UI primitives are
   shadcn/ui (`components.json`, style `base-nova`, base color `neutral`) under
-  `resources/js/components/ui`; add new ones with the `shadcn` CLI rather than hand-rolling.
+  `resources/js/components/ui`; add new ones with the `shadcn` CLI rather than hand-rolling (the CLI prompts to overwrite
+  existing files and may add stray dependencies to `package.json`; check `git diff` afterwards).
+- **Never use `window.confirm`/`alert`/`prompt`.** Confirmations use the shadcn `AlertDialog` through the `useConfirm()` hook
+  (`resources/js/hooks/use-confirm.tsx`): `const { confirm, confirmDialog } = useConfirm()`, render `{confirmDialog}` once in
+  the component and `if (!(await confirm({ title, description, destructive }))) return` in the handler.
 - `HandleInertiaRequests::share()` puts the authenticated user (`id`, `username`, `role`, and
   nested `guru` profile) and a one-shot `flash.toast` into every page's props — read auth state
   from Inertia props / `resources/js/context/auth-context.tsx`, not a separate fetch.
@@ -125,9 +127,12 @@ break relations and casts silently.
   `JadwalHari.batasTelat`); second one fills `jamPulang`. Both check-in paths funnel into this one
   private method — they only differ in how presence is verified:
   - **Kiosk/QR path** (`checkinByQrToken`): a shared school device (logged in as `ADMIN`) scans a
-    guru's permanent static `qrToken` through its own camera (`resources/js/pages/kiosk-page.tsx`,
-    `html5-qrcode` decoding in-browser — no external barcode-scanner hardware). Physical presence at
-    the device *is* the proof; who's logged into the browser is irrelevant.
+    guru's permanent static `qrToken` (`resources/js/pages/kiosk-page.tsx`). Two input modes, switched by a
+    button on the page and remembered per device in `localStorage` (`kiosk-input-mode`): **kamera**
+    (`html5-qrcode` decoding in-browser, default) and **alat** (USB barcode/QR scanner that types the token
+    plus Enter into an always-focused input, with a clock/card layout). Both modes call the same
+    `handleScan` → `POST /kiosk/scan-qr`, so the server logic below is identical for either. Physical
+    presence at the device *is* the proof; who's logged into the browser is irrelevant.
   - **Web path** (`checkinWeb`): the guru's own browser reports GPS, checked against
     `App\Support\Geofence` (`SCHOOL_LAT`/`SCHOOL_LNG`/`SCHOOL_RADIUS_METERS`, currently 100m).
     **School coordinates are hardcoded constants in `Geofence.php`**, not a DB/settings value —
@@ -136,8 +141,13 @@ break relations and casts silently.
   - Per-day schedule (open time, late cutoff, checkout time, briefing window, active/inactive) is
     `JadwalHari`, one row per weekday, served through `JadwalService`.
 - Briefing attendance (`BriefingAttendance` / `BriefingController` / `BriefingService`) is a
-  parallel, separate check-in flow for the morning briefing session — don't conflate it with
-  regular `Attendance`.
+  parallel, separate record for the morning briefing session — don't conflate it with regular
+  `Attendance`. It is written from the kiosk scan: the first scan of the day during the briefing window
+  records MASUK and briefing together (`catatDariScanKiosk`); a scan from a guru who already checked in
+  (e.g. via web/GPS) records BRIEFING only; a scan before the window records MASUK only. The
+  `/briefing` admin page (`pages/admin/briefing-page.tsx`) no longer has its own camera scanner: it is
+  only the recap table, filters, Excel export and manual correction (`/briefing/manual`). The
+  `/briefing/scan` endpoint still exists but no page calls it.
 - Recap/export (`RekapController`, `App\Support\XlsxExport`, PhpSpreadsheet) reconstructs a full
   date range per guru from `Attendance` + approved `LeaveRequest` + `Holiday`, filling in `ALPA`
   for unresolved past school days — see `AttendanceService::rekap()`.
@@ -172,47 +182,38 @@ Two independent, non-composable seeders — never run both against the same DB:
 
 ## Shared database (SPPD)
 
-> **Update 2026-09-24:** the standalone `../sppd` folder was deleted from this laptop (it was not a git
-> repo). SPPD now lives only in this repo as a module (commit `add sppd module`: `App\Http\Controllers\Sppd`,
-> `/sppd` routes, `resources/js/pages/sppd`, `*_sppd_*` migrations). The paragraphs below that tell you to work
-> from the sppd project or mirror migrations into its local copy are history and can no longer be followed;
-> write SPPD schema changes here.
+SPPD (surat perintah perjalanan dinas) adalah modul di repo ini, bukan aplikasi terpisah: `App\Http\Controllers\Sppd`,
+rute `/sppd/*`, `resources/js/pages/sppd`, migrasi `*_sppd_*`, dan layanan di `App\Services\Sppd`. Dulu SPPD proyek
+Laravel sendiri (`../sppd`) yang digabung ke basis data ini pada 2026-09-23 lalu foldernya dihapus; **semua perubahan skema
+SPPD ditulis dan dimigrasi dari repo ini**. Basis data `absensi_laravel` berisi data nyata kedua bagian, jadi jangan
+menjalankan `migrate:fresh`, `migrate:refresh`, atau `db:wipe`.
 
-This app's database (`absensi_laravel`) is also used by a second, separate Laravel app — `sppd`
-(`../sppd`, Surat Perintah Perjalanan Dinas) — merged in 2026-09-23 so both apps run on one MySQL
-database instead of two. **This app owns `users` and its own tables.** SPPD owns its own domain
-tables and anything prefixed `sppd_` — new SPPD-only schema changes are written and migrated from
-the sppd project directly (`php artisan migrate` there only ever applies migrations not yet
-recorded, so it can't collide with or re-run this app's migrations). Changes to `users` itself
-still belong here. Never run `migrate:fresh` or `migrate:refresh` from the sppd project — both
-would drop every table in this shared database, not just SPPD's.
-
-- **`users` is the single shared login for both apps.** SPPD's profile columns (`name`, `jabatan`,
-  `signature_path`, `is_active`) live on this table alongside absensi's own (`username`,
-  `password`, `role`). `role` (`ADMIN`/`GURU`/`KEPSEK`) is nullable — SPPD-only staff (TU,
-  bendahara who aren't teachers) may have no absensi role at all. SPPD's own authorization is
-  layered on top via `spatie/laravel-permission` (`roles`, `permissions`, `model_has_roles`,
-  `model_has_permissions`, `role_has_permissions` tables) — a person can simultaneously have an
-  absensi `role` and one or more SPPD spatie roles (e.g. `tetitresnawati` is `KEPSEK` here and
-  `kepala_sekolah` in SPPD).
-- **SPPD's domain tables** (`pengajuan_sppds`, `sppds`, `pencairans`, `log_audits`,
-  `pengajuan_pengikut`, `konfirmasi_kedatangans`, `pengaturans`) live in this database unprefixed —
-  they never collided with anything absensi already had. Every column that references a user
-  (`pemohon_id`, `disetujui_oleh`, `diterbitkan_oleh`, `dicairkan_oleh`, `user_id`,
-  `dikonfirmasi_oleh`) is `string(191)` to match `users.id` (ULID), not Laravel's default
-  `foreignId`/`unsignedBigInteger`.
-- **Tables prefixed `sppd_`** exist only because the unprefixed name was already taken by an
-  absensi table with an incompatible shape, or because SPPD needs its own isolated
-  session/cache/queue storage: `sppd_notifications` (absensi already has its own, differently
-  shaped `notifications` table), `sppd_sessions`, `sppd_cache`/`sppd_cache_locks`, `sppd_jobs`/
-  `sppd_job_batches`/`sppd_failed_jobs` (SPPD runs `SESSION_DRIVER`/`CACHE_STORE`/
-  `QUEUE_CONNECTION=database`; absensi uses `file`/`sync` and doesn't have these tables at all).
-- Adding a migration here that changes `users` means also mirroring it into SPPD's *local* copy of
-  that table's migration (`sppd/database/migrations/0001_01_01_000000_create_users_table.php`,
-  used only to build its SQLite test schema) and, if behavior is affected, into SPPD's own
-  `App\Models\User`. `sppd_*` tables and SPPD's domain tables (`pengajuan_sppds`, `sppds`, etc.)
-  are migrated from the sppd project itself now, not from here — see its CLAUDE.md.
-- The migration that added the SPPD tables also ran a one-off data copy from the old standalone
-  `sppd` database (31 users, their spatie roles, and all SPPD domain rows), remapping SPPD's old
-  auto-increment user ids to absensi's ULIDs by matching `username`. That database is no longer
-  used by either app but hasn't been dropped.
+- **`users` adalah satu-satunya login** untuk absensi dan SPPD. Kolom profil SPPD (`name`, `jabatan`, `signature_path`,
+  `is_active`) ada di tabel ini bersama kolom absensi (`username`, `password`, `role`). `role` (`ADMIN`/`GURU`/`KEPSEK`)
+  boleh null: staf yang hanya memakai SPPD (TU, bendahara non-guru) tidak punya peran absensi. Otorisasi SPPD ada di
+  atasnya lewat `spatie/laravel-permission` (middleware `sppd.role:`, enum `App\Enums\Sppd\RoleName`: `pemohon`,
+  `kepala_sekolah`, `tu`, `bendahara`), sehingga satu orang bisa punya `role` absensi dan peran SPPD sekaligus (mis.
+  `KEPSEK` di absensi dan `kepala_sekolah` di SPPD). Mengubah kolom atau peran di `users` berdampak ke absensi, SPPD, dan
+  login web, jadi periksa kedua sisi.
+- **Tabel domain SPPD** (`pengajuan_sppds`, `sppds`, `pencairans`, `log_audits`, `pengajuan_pengikut`,
+  `laporan_perjalanans`, `laporan_perjalanan_fotos`, `pengaturans`) tanpa awalan. Setiap kolom yang merujuk pengguna (`pemohon_id`,
+  `disetujui_oleh`, `diterbitkan_oleh`, `dicairkan_oleh`, `user_id`, `ditulis_oleh`) bertipe `string(191)` agar cocok
+  dengan `users.id` (ULID), bukan `foreignId` bawaan Laravel.
+- **Tabel berawalan `sppd_`** ada karena namanya sudah dipakai tabel absensi yang bentuknya berbeda
+  (`sppd_notifications` vs `notifications` absensi), atau karena SPPD punya penyimpanan sesi/cache/antrean sendiri
+  (`sppd_sessions`, `sppd_cache`/`sppd_cache_locks`, `sppd_jobs`/`sppd_job_batches`/`sppd_failed_jobs`). Absensi sendiri
+  memakai `SESSION_DRIVER=file`, `CACHE_STORE=file`, `QUEUE_CONNECTION=sync`.
+- **Tidak ada TTE dan konfirmasi kedatangan lagi.** Tanda tangan elektronik (QR, sidik jari, halaman verifikasi publik) dan
+  form konfirmasi kedatangan di tujuan dihapus; sisi belakang SPPD (pejabat tujuan, tanggal tiba dan pulang) diisi
+  manual dengan pulpen oleh pejabat penerima. Gambar tanda tangan Kepala Sekolah di profil (`signature_path`, disalin ke
+  `tanda_tangan_kepsek_path` saat menyetujui) masih dipakai di PDF. Migrasi `2026_10_02_100100_drop_sppd_tte_dan_konfirmasi_kedatangan`
+  membuang kolom `tte_*` dan tabel `konfirmasi_kedatangans`; jalankan hanya bila data lamanya memang boleh hilang.
+- **PDF SPPD** hanya satu template: `resources/views/pdf/sppd.blade.php` (A4 mendatar, satu halaman depan-belakang), data
+  disiapkan `App\Services\Sppd\SppdPdfData`, diunduh lewat `PengajuanSppdController::downloadSppd`. Template aktual,
+  portrait, dan halaman pengaturan template sudah dihapus. Sisi belakang (pejabat tujuan, tanggal tiba/pulang) sengaja kosong.
+- **Berkas unggahan** (foto guru, lampiran izin, undangan, tanda tangan, foto laporan perjalanan) disajikan lewat
+  `GET /uploads/{path}` (`UploadController`) dan hanya untuk pengguna yang login (middleware `auth`).
+- **Laporan perjalanan** (`LaporanPerjalanan` + `LaporanFoto`, tabel `laporan_perjalanans` dan `laporan_perjalanan_fotos`): pemohon
+  mengisi rangkuman dan 1 sampai 10 foto dokumentasi selama status `sedang_ditugaskan` (policy `isiLaporan`, rute
+  `POST /sppd/pengajuan/{id}/laporan`). Hanya tampil di halaman pengajuan, tidak masuk PDF SPPD. Berkas disimpan di disk
+  `public` folder `laporan-perjalanan`.

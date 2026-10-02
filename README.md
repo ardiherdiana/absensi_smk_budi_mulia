@@ -7,15 +7,15 @@ Satu repo dan satu basis data (`absensi_laravel`) memuat dua bagian:
 | Bagian | Alamat | Untuk siapa | Keterangan |
 | --- | --- | --- | --- |
 | Absensi (inti) | `/absen/dashboard` dan halaman lain di akar | `ADMIN`, `GURU`, `KEPSEK` | Absen QR dan web, briefing pagi, izin/sakit, rekap, jadwal, hari libur, notifikasi |
-| SPPD | `/sppd/...` | Pemohon, kepala sekolah, TU, bendahara | Surat perintah perjalanan dinas: pengajuan, persetujuan dengan tanda tangan elektronik, penerbitan, uang muka, laporan. Ditandai "Sedang dalam pengembangan" di menu utama |
+| SPPD | `/sppd/...` | Pemohon, kepala sekolah, TU, bendahara | Surat perintah perjalanan dinas: pengajuan, persetujuan dengan tanda tangan Kepala Sekolah, penerbitan, uang muka, laporan perjalanan (rangkuman dan foto dokumentasi), laporan keuangan, unduh SPPD sebagai PDF (satu template A4 mendatar, sisi belakang diisi pulpen). Ditandai "Sedang dalam pengembangan" di menu utama |
 
-Setelah masuk, pengguna tiba di **Menu Utama** (`/menu-utama`) untuk memilih Absen atau SPPD.
+Setelah masuk, pengguna tiba di **Menu Utama** (`/menu-utama`) untuk memilih Absen atau SPPD. Sidebar kedua modul punya menu **Profil** (grup Sistem) dan tombol **Keluar** (footer); halaman profil menampilkan data akun, kehadiran bulan berjalan (guru), foto, dan ganti password.
 
 ## Fitur utama (absensi)
 
-- **Absen lewat kiosk** - admin masuk di komputer/tablet sekolah; guru menunjukkan QR pribadinya (permanen, dari HP atau kartu cetak) ke kamera perangkat itu untuk absen masuk dan pulang. Terlambat atau tidak ditentukan otomatis dari jadwal hari itu.
+- **Absen lewat kiosk** - admin masuk di komputer/tablet sekolah; guru menunjukkan QR pribadinya (permanen, dari HP atau kartu cetak) ke perangkat itu untuk absen masuk dan pulang. Perangkat kiosk punya dua mode input yang bisa dipilih di halamannya: kamera, atau alat scan QR USB (mengetik isi QR otomatis). Pilihan mode diingat per perangkat. Terlambat atau tidak ditentukan otomatis dari jadwal hari itu.
 - **Absen lewat web** - guru menekan tombol di peramban; server menerima koordinat dan menolak bila lebih dari 100 m dari sekolah.
-- **Absen briefing** - sesi terpisah untuk briefing pagi, dipindai admin lewat kamera, dengan jam mulai dan selesai per hari.
+- **Absen briefing** - sesi terpisah untuk briefing pagi, dicatat dari scan kiosk yang sama (absen masuk dan briefing sekaligus, atau briefing saja bila guru sudah absen lewat lokasi), dengan jam mulai dan selesai per hari. Halaman `/briefing` hanya untuk rekap, ekspor, dan koreksi manual.
 - **Multi-role**: `ADMIN`, `GURU`, `KEPSEK` (kepala sekolah), masing-masing dengan menu sendiri.
 - **Pengajuan izin/sakit** dengan lampiran oleh guru, disetujui atau ditolak admin atau kepala sekolah.
 - **Rekap dan ekspor Excel** - laporan absensi dan briefing dengan kop sekolah, ringkasan, warna status per baris, siap cetak (`.xlsx`, PhpSpreadsheet).
@@ -62,7 +62,6 @@ Variabel `.env` yang perlu diperhatikan:
 | `INERTIA_ENCRYPT_HISTORY=true` | **Wajib `true` di semua lingkungan.** Mencegah tombol kembali menampilkan halaman lama (form masuk basi atau dashboard akun lain) dari riwayat Inertia setelah masuk atau keluar |
 | `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, `VAPID_SUBJECT` | Web Push. Buat dengan `php artisan webpush:vapid`. Kosong berarti push mati tanpa galat |
 | `OPENSSL_CONF` | Hanya di Windows bila push gagal diam-diam; arahkan ke `openssl.cnf` milik Git for Windows |
-| `TTE_SECRET` | Kunci tanda tangan elektronik SPPD. Kosong berarti memakai `APP_KEY`. Belum ada di `.env.example` |
 
 Pengingat absen memakai penjadwal Laravel (`attendance:send-reminders` tiap menit). Di server, pasang cron `* * * * * php artisan schedule:run`.
 
@@ -102,30 +101,17 @@ app/Console/Commands/       SendAttendanceReminders
 database/migrations|seeders|factories
 routes/                     web.php (absensi + SPPD), console.php (penjadwal)
 resources/js/               main.tsx, pages/, layouts/, components/ (ui/ = shadcn), lib/, context/, types/
-resources/views/            app.blade.php, pdf/ (SPPD, laporan), mail/
+resources/views/            app.blade.php, pdf/ (SPPD dan laporan keuangan)
 public/                     sw.js, manifest.json, ikon PWA, logo_smk.png
 tests/                      Feature/ (Admin, Attendance, Auth, Briefing, Leave, Middleware, Sppd, ...) dan Unit/
-md/                         dokumen proyek (tidak masuk git)
 ```
 
 ## Dokumentasi
 
-Dokumen proyek ada di folder `md/` (lokal, tidak ikut git):
-
-| Berkas | Isi |
-| --- | --- |
-| `md/PRD.md` | Tujuan, pengguna, ruang lingkup, kebutuhan fungsional per bagian, aturan bisnis, status dan risiko |
-| `md/ARCHITECTURE.md` | Alur permintaan, peran dan otorisasi, frontend, domain kehadiran, data, modul SPPD, konfigurasi |
-| `md/DESIGN_SYSTEM.md` | Token warna terang/gelap, cara kerja tema, komponen, kontras terukur |
-| `md/SECURITY.md` | Data yang dilindungi, kontrol yang ada, celah yang diketahui, daftar periksa rilis |
-| `md/CODE_STYLE.md` | Konvensi PHP dan TypeScript, model dan migrasi, galat, komentar |
-| `md/TESTING.md` | Pemeriksaan statis, tes PHPUnit per area, daftar uji manual, yang belum diuji |
-
-Petunjuk untuk asisten pemrograman ada di `AGENTS.md` dan `CLAUDE.md` (akar repo). SIMAK (nilai siswa dan supervisi guru) adalah proyek terpisah di `../simak`.
+Tidak ada folder dokumen terpisah; berkas ini adalah dokumentasi proyek. Konvensi dan jebakan yang tidak terlihat dari kode ada di `CLAUDE.md` (model, alur permintaan, domain absensi, basis data bersama dengan SPPD) dan aturan kerja untuk asisten pemrograman di `AGENTS.md`, keduanya di akar repo. SIMAK (nilai siswa dan supervisi guru) adalah proyek terpisah di `../simak`.
 
 ## Catatan keamanan
 
 - **Jangan pernah commit `.env`, `.env.local`, `.env.production`, dump basis data (`database/seeders/data/production.sql`, `*.sqlite`), atau paket unggahan (`app.zip` dan arsip lain).** Semuanya sudah dicakup `.gitignore`; hanya `.env.example` (isinya placeholder, tanpa kredensial asli) yang boleh masuk git.
-- Foto guru dan lampiran izin yang diunggah (`storage/app/public/`) juga otomatis diabaikan git.
+- Foto guru dan lampiran izin yang diunggah (`storage/app/public/`) juga otomatis diabaikan git. Berkas unggahan hanya bisa dibuka lewat `/uploads/...` oleh pengguna yang login.
 - Kalau struktur environment berubah, perbarui `.env.example` supaya tetap jadi referensi yang akurat.
-- Daftar celah keamanan yang diketahui dan belum ditutup ada di `md/SECURITY.md` bagian 7.

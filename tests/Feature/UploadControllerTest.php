@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Models\User;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
 use Tests\TestCase;
@@ -13,16 +14,24 @@ class UploadControllerTest extends TestCase
         Storage::fake('public');
         Storage::disk('public')->putFileAs('guru', UploadedFile::fake()->image('foto.png'), 'foto.png');
 
-        $response = $this->get('/uploads/guru/foto.png');
+        $response = $this->actingAs(User::factory()->create())->get('/uploads/guru/foto.png');
 
         $response->assertOk();
+    }
+
+    public function test_uploads_require_login(): void
+    {
+        Storage::fake('public');
+        Storage::disk('public')->putFileAs('guru', UploadedFile::fake()->image('foto.png'), 'foto.png');
+
+        $this->get('/uploads/guru/foto.png')->assertRedirect('/login');
     }
 
     public function test_a_missing_upload_returns_404(): void
     {
         Storage::fake('public');
 
-        $response = $this->get('/uploads/guru/does-not-exist.jpg');
+        $response = $this->actingAs(User::factory()->create())->get('/uploads/guru/does-not-exist.jpg');
 
         $response->assertStatus(404);
     }

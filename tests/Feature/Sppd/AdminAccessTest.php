@@ -44,7 +44,6 @@ class AdminAccessTest extends TestCase
         $this->actingAs($admin)->get(route('sppd.pengajuan.create'))->assertOk();
         $this->actingAs($admin)->get(route('sppd.signature.edit'))->assertOk();
         $this->actingAs($admin)->get(route('sppd.pegawai.index'))->assertOk();
-        $this->actingAs($admin)->get(route('sppd.template-sppd.edit'))->assertOk();
         $this->actingAs($admin)->get(route('sppd.laporan.index'))->assertOk();
     }
 

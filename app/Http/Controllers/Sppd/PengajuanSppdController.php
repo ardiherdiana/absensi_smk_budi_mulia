@@ -4,9 +4,8 @@ namespace App\Http\Controllers\Sppd;
 
 use App\Enums\Sppd\PengajuanStatus;
 use App\Enums\Sppd\RoleName;
-use App\Enums\Sppd\SppdTemplate;
 use App\Http\Controllers\Controller;
-use App\Http\Requests\Sppd\KonfirmasiKedatanganRequest;
+use App\Http\Requests\Sppd\SimpanLaporanRequest;
 use App\Http\Requests\Sppd\StorePengajuanRequest;
 use App\Models\Sppd\LogAudit;
 use App\Models\Sppd\PengajuanSppd;
@@ -90,7 +89,7 @@ class PengajuanSppdController extends Controller
 
         $pengajuan->load([
             'pemohon', 'penyetuju', 'sppd', 'pengikuts:users.id,users.name,users.jabatan',
-            'pencairans.pencair',
+            'pencairans.pencair', 'laporan.fotos', 'laporan.penulis:users.id,users.name',
         ]);
 
         $riwayat = LogAudit::query()
@@ -100,27 +99,25 @@ class PengajuanSppdController extends Controller
             ->oldest()
             ->get();
 
-        $kedatangan = $pengajuan->kedatangan()->first();
+        $laporan = $pengajuan->laporan;
 
         return Inertia::render('sppd/pengajuan/show', [
-            'pengajuan' => $pengajuan,
+            'pengajuan' => $pengajuan->makeHidden('laporan'),
             'riwayat' => $riwayat,
-            'kedatangan' => $kedatangan ? [
-                'pejabat_nama' => $kedatangan->pejabat_nama,
-                'pejabat_jabatan' => $kedatangan->pejabat_jabatan,
-                'tiba_tanggal' => $kedatangan->tiba_tanggal->toDateString(),
-                'berangkat_tanggal' => $kedatangan->berangkat_tanggal->toDateString(),
-                'bukti_path' => $kedatangan->bukti_path,
-                'dikonfirmasi_at' => $kedatangan->updated_at->toIso8601String(),
+            'laporan' => $laporan ? [
+                'ringkasan' => $laporan->ringkasan,
+                'penulis' => $laporan->penulis?->name,
+                'diperbarui_at' => $laporan->updated_at->toIso8601String(),
+                'fotos' => $laporan->fotos->map(fn ($foto) => [
+                    'id' => $foto->id,
+                    'path' => $foto->path,
+                    'nama_asli' => $foto->nama_asli,
+                ])->all(),
             ] : null,
-            'kedatanganDefault' => [
-                'tiba_tanggal' => $pengajuan->tanggal_berangkat->toDateString(),
-                'berangkat_tanggal' => $pengajuan->tanggal_kembali->toDateString(),
-            ],
             'can' => [
                 'approve' => $request->user()->can('approve', $pengajuan),
                 'terbitkanSppd' => $request->user()->can('terbitkanSppd', $pengajuan),
-                'konfirmasiKedatangan' => $request->user()->can('konfirmasiKedatangan', $pengajuan),
+                'isiLaporan' => $request->user()->can('isiLaporan', $pengajuan),
                 'cairkanUangMuka' => $request->user()->can('cairkanUangMuka', $pengajuan),
                 'selesaikan' => $request->user()->can('selesaikan', $pengajuan),
             ],
@@ -164,15 +161,24 @@ class PengajuanSppdController extends Controller
         return back()->with('success', 'SPPD berhasil diterbitkan.');
     }
 
-    public function konfirmasiKedatangan(KonfirmasiKedatanganRequest $request, PengajuanSppd $pengajuan): RedirectResponse
+    public function simpanLaporan(SimpanLaporanRequest $request, PengajuanSppd $pengajuan): RedirectResponse
     {
-        $bukti = $request->file('bukti')?->store('kedatangan', 'public');
+        $fotoBaru = collect($request->file('fotos', []))
+            ->map(fn ($file) => [
+                'path' => $file->store('laporan-perjalanan', 'public'),
+                'nama_asli' => $file->getClientOriginalName(),
+            ])
+            ->all();
 
-        $this->workflow->konfirmasiKedatangan($pengajuan, $request->user(), $request->safe()->only([
-            'pejabat_nama', 'pejabat_jabatan', 'tiba_tanggal', 'berangkat_tanggal',
-        ]), $bukti);
+        $this->workflow->simpanLaporan(
+            $pengajuan,
+            $request->user(),
+            $request->string('ringkasan')->toString(),
+            $request->input('hapus_foto_ids', []),
+            $fotoBaru,
+        );
 
-        return back()->with('success', 'Kedatangan berhasil dikonfirmasi.');
+        return back()->with('success', 'Laporan perjalanan berhasil disimpan.');
     }
 
     public function cairkanUangMuka(Request $request, PengajuanSppd $pengajuan): RedirectResponse
@@ -202,15 +208,13 @@ class PengajuanSppdController extends Controller
     {
         $this->authorize('view', $pengajuan);
 
-        $pengajuan->load(['pemohon', 'penyetuju', 'sppd', 'pengikuts', 'kedatangan']);
+        $pengajuan->load(['pemohon', 'penyetuju', 'sppd', 'pengikuts']);
         abort_if(! $pengajuan->sppd, 404);
 
         $nomor = str_replace('/', '-', $pengajuan->sppd->nomor_sppd);
 
-        $template = SppdTemplate::saatIni();
-
-        return Pdf::loadView($template->view(), ['pengajuan' => $pengajuan])
-            ->setPaper('a4', $template->orientasi())
+        return Pdf::loadView('pdf.sppd', ['pengajuan' => $pengajuan])
+            ->setPaper('a4', 'landscape')
             ->download("sppd-{$nomor}.pdf");
     }
 }

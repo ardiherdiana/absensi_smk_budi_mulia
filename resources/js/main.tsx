@@ -8,7 +8,7 @@ import { Toaster } from "@/components/ui/sonner.tsx"
 import { DashboardLayout } from "@/layouts/dashboard-layout"
 import { SppdLayout } from "@/layouts/sppd-layout"
 
-const BARE_PAGES = new Set(["login-page", "kiosk-page", "module-picker-page", "sppd/verifikasi/show"])
+const BARE_PAGES = new Set(["login-page", "kiosk-page", "module-picker-page"])
 
 if ("serviceWorker" in navigator) {
   navigator.serviceWorker.register("/sw.js")

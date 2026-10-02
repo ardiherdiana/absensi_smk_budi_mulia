@@ -3,6 +3,7 @@ import { toast } from "sonner"
 import { Plus, Trash2 } from "lucide-react"
 
 import type { Holiday } from "@/lib/types"
+import { useConfirm } from "@/hooks/use-confirm"
 import { formatTanggal, todayIso } from "@/lib/attendance-format"
 import { Button } from "@/components/ui/button"
 import { DatePicker } from "@/components/date-picker"
@@ -18,6 +19,7 @@ import {
 } from "@/components/ui/table"
 
 export function LiburPage({ list }: { list: Holiday[] }) {
+  const { confirm, confirmDialog } = useConfirm()
   const { data, setData, post, processing, errors, reset } = useForm({
     tanggal: todayIso(),
     keterangan: "",
@@ -34,8 +36,13 @@ export function LiburPage({ list }: { list: Holiday[] }) {
     })
   }
 
-  function handleDelete(holiday: Holiday) {
-    if (!window.confirm(`Hapus hari libur "${holiday.keterangan}"?`)) return
+  async function handleDelete(holiday: Holiday) {
+    const ok = await confirm({
+      title: `Hapus hari libur "${holiday.keterangan}"?`,
+      confirmLabel: "Hapus",
+      destructive: true,
+    })
+    if (!ok) return
     router.delete(`/hari-libur/${holiday.id}`, {
       preserveScroll: true,
       onSuccess: () => toast.success("Hari libur berhasil dihapus"),
@@ -44,6 +51,7 @@ export function LiburPage({ list }: { list: Holiday[] }) {
 
   return (
     <div className="flex flex-col gap-4">
+      {confirmDialog}
       <div>
         <h1 className="text-xl font-semibold">Hari Libur</h1>
         <p className="text-sm text-muted-foreground">

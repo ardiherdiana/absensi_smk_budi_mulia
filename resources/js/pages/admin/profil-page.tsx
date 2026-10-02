@@ -3,7 +3,7 @@ import { useForm } from "@inertiajs/react"
 import { toast } from "sonner"
 
 import { useAuth } from "@/context/auth-context"
-import { LogoutButton } from "@/components/logout-button"
+import { ProfilRingkasan } from "@/components/profil-ringkasan"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Field, FieldGroup, FieldLabel } from "@/components/ui/field"
@@ -35,13 +35,20 @@ export function AdminProfilPage() {
   }
 
   return (
-    <div className="flex max-w-lg flex-col gap-6">
+    <div className="flex flex-col gap-6">
       <div>
         <h1 className="text-xl font-semibold">Profil Saya</h1>
         <p className="text-sm text-muted-foreground">
-          Kelola password akun {user?.username}
+          Lihat data akun dan kelola password akun {user?.username}
         </p>
       </div>
+
+      <div className="grid items-start gap-6 lg:grid-cols-2">
+        <div className="flex flex-col gap-6">
+          <ProfilRingkasan />
+        </div>
+
+        <div className="flex flex-col gap-6">
 
       <Card>
         <CardHeader>
@@ -104,7 +111,8 @@ export function AdminProfilPage() {
         </CardContent>
       </Card>
 
-      <LogoutButton />
+        </div>
+      </div>
     </div>
   )
 }

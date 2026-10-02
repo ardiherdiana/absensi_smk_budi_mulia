@@ -5,6 +5,7 @@ import { Eye, Flame, Pencil, Plus, QrCode, RefreshCw, Trash2, Upload } from "luc
 
 import { useAuth } from "@/context/auth-context"
 import { api, ApiError, assetUrl } from "@/lib/api"
+import { useConfirm } from "@/hooks/use-confirm"
 import type { Guru, GuruAttendanceDetail } from "@/lib/types"
 import { initials } from "@/lib/utils"
 import { startOfMonthIso } from "@/lib/attendance-format"
@@ -80,6 +81,7 @@ interface Props {
 export function GuruPage({ guruList, search: initialSearch }: Props) {
   const { user } = useAuth()
   const isAdmin = user?.role === "ADMIN"
+  const { confirm, confirmDialog } = useConfirm()
   const [search, setSearch] = React.useState(initialSearch ?? "")
   const [dialogOpen, setDialogOpen] = React.useState(false)
   const [uploadingPhoto, setUploadingPhoto] = React.useState(false)
@@ -211,13 +213,13 @@ export function GuruPage({ guruList, search: initialSearch }: Props) {
   }
 
   async function handleRegenerateQr(guru: Guru) {
-    if (
-      !window.confirm(
-        `Buat ulang QR untuk "${guru.nama}"? QR lama (di HP/kartu lama) tidak akan berfungsi lagi.`
-      )
-    ) {
-      return
-    }
+    const ok = await confirm({
+      title: `Buat ulang QR untuk "${guru.nama}"?`,
+      description: "QR lama (di HP/kartu lama) tidak akan berfungsi lagi.",
+      confirmLabel: "Buat ulang QR",
+      destructive: true,
+    })
+    if (!ok) return
     setRegenerating(true)
     try {
       const updated = await api.post<Guru>(`/data-guru/${guru.id}/qr/regenerate`)
@@ -231,10 +233,14 @@ export function GuruPage({ guruList, search: initialSearch }: Props) {
     }
   }
 
-  function handleDelete(guru: Guru) {
-    if (!window.confirm(`Hapus akun guru "${guru.nama}"? Tindakan ini tidak bisa dibatalkan.`)) {
-      return
-    }
+  async function handleDelete(guru: Guru) {
+    const ok = await confirm({
+      title: `Hapus akun guru "${guru.nama}"?`,
+      description: "Tindakan ini tidak bisa dibatalkan.",
+      confirmLabel: "Hapus",
+      destructive: true,
+    })
+    if (!ok) return
     router.delete(`/data-guru/${guru.id}`, {
       preserveScroll: true,
       onSuccess: () => toast.success("Akun guru berhasil dihapus"),
@@ -244,6 +250,7 @@ export function GuruPage({ guruList, search: initialSearch }: Props) {
 
   return (
     <div className="flex flex-col gap-4">
+      {confirmDialog}
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h1 className="text-xl font-semibold">Data Guru</h1>

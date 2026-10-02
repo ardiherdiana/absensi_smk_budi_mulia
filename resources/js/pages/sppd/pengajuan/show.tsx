@@ -1,4 +1,3 @@
-import { DatePicker } from '@/components/sppd/date-picker';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -13,12 +12,13 @@ import {
     TableRow,
 } from '@/components/ui/table';
 import { Textarea } from '@/components/ui/textarea';
+import { useConfirm } from '@/hooks/use-confirm';
 import { statusBadge } from '@/lib/pengajuan';
 import { formatDate, formatJam } from '@/lib/utils';
 import { type SppdPageProps } from '@/types/sppd';
 import { Head, Link, router, useForm, usePage } from '@inertiajs/react';
 import { DownloadIcon } from 'lucide-react';
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { toast } from 'sonner';
 
 interface UserRef {
@@ -46,7 +46,6 @@ interface Pengajuan {
     jam_kembali: string;
     undangan_path: string | null;
     catatan_kepsek: string | null;
-    tte_kode: string | null;
     alat_angkutan: string | null;
     keterangan: string | null;
     pengikuts: { id: number; name: string; jabatan: string | null }[];
@@ -56,13 +55,17 @@ interface Pengajuan {
     pencairans: Pencairan[];
 }
 
-interface Kedatangan {
-    pejabat_nama: string;
-    pejabat_jabatan: string;
-    tiba_tanggal: string;
-    berangkat_tanggal: string;
-    bukti_path: string | null;
-    dikonfirmasi_at: string;
+interface LaporanFoto {
+    id: number;
+    path: string;
+    nama_asli: string | null;
+}
+
+interface Laporan {
+    ringkasan: string;
+    penulis: string | null;
+    diperbarui_at: string;
+    fotos: LaporanFoto[];
 }
 
 interface Riwayat {
@@ -75,7 +78,7 @@ interface Riwayat {
 interface Can {
     approve: boolean;
     terbitkanSppd: boolean;
-    konfirmasiKedatangan: boolean;
+    isiLaporan: boolean;
     cairkanUangMuka: boolean;
     selesaikan: boolean;
 }
@@ -83,8 +86,7 @@ interface Can {
 interface Props extends SppdPageProps {
     pengajuan: Pengajuan;
     riwayat: Riwayat[];
-    kedatangan: Kedatangan | null;
-    kedatanganDefault: { tiba_tanggal: string; berangkat_tanggal: string };
+    laporan: Laporan | null;
     can: Can;
 }
 
@@ -222,69 +224,133 @@ function TerbitkanPanel({ pengajuan }: { pengajuan: Pengajuan }) {
     );
 }
 
-function KedatanganPanel({ pengajuan, kedatangan, defaults }: { pengajuan: Pengajuan; kedatangan: Kedatangan | null; defaults: Props['kedatanganDefault'] }) {
-    const { data, setData, post, processing, errors, reset } = useForm({
-        pejabat_nama: kedatangan?.pejabat_nama ?? '',
-        pejabat_jabatan: kedatangan?.pejabat_jabatan ?? '',
-        tiba_tanggal: kedatangan?.tiba_tanggal ?? defaults.tiba_tanggal,
-        berangkat_tanggal: kedatangan?.berangkat_tanggal ?? defaults.berangkat_tanggal,
-        bukti: null as File | null,
+function FotoGrid({ fotos }: { fotos: LaporanFoto[] }) {
+    return (
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+            {fotos.map((foto) => (
+                <a key={foto.id} href={`/uploads/${foto.path}`} target="_blank" rel="noreferrer" className="block overflow-hidden rounded-md border">
+                    <img src={`/uploads/${foto.path}`} alt={foto.nama_asli ?? 'Foto dokumentasi'} className="aspect-video w-full object-cover" loading="lazy" />
+                </a>
+            ))}
+        </div>
+    );
+}
+
+function LaporanPanel({ pengajuan, laporan }: { pengajuan: Pengajuan; laporan: Laporan | null }) {
+    const { data, setData, post, processing, errors } = useForm({
+        ringkasan: laporan?.ringkasan ?? '',
+        fotos: [] as File[],
+        hapus_foto_ids: [] as number[],
     });
 
-    const err = (message?: string) => (message ? [{ message }] : undefined);
+    const fotoLama = laporan?.fotos ?? [];
+    const sisaLama = fotoLama.filter((f) => !data.hapus_foto_ids.includes(f.id));
+    const previews = useMemo(() => data.fotos.map((file) => URL.createObjectURL(file)), [data.fotos]);
+    const totalFoto = sisaLama.length + data.fotos.length;
+
+    const fotoErrors = Object.entries(errors)
+        .filter(([key]) => key === 'fotos' || key.startsWith('fotos.'))
+        .map(([, message]) => ({ message }));
+
+    const tambahFoto = (files: FileList | null) => {
+        if (!files) return;
+        setData('fotos', [...data.fotos, ...Array.from(files)]);
+    };
+
+    const toggleHapus = (id: number) => {
+        setData('hapus_foto_ids', data.hapus_foto_ids.includes(id) ? data.hapus_foto_ids.filter((x) => x !== id) : [...data.hapus_foto_ids, id]);
+    };
 
     const submit: React.FormEventHandler = (e) => {
         e.preventDefault();
-        post(route('sppd.pengajuan.kedatangan', pengajuan.id), {
+        post(route('sppd.pengajuan.laporan', pengajuan.id), {
             forceFormData: true,
             preserveScroll: true,
-            onSuccess: () => reset('bukti'),
+            onSuccess: () => {
+                setData('fotos', []);
+                setData('hapus_foto_ids', []);
+            },
         });
     };
 
     return (
         <Card>
             <CardHeader>
-                <CardTitle className="text-base">Konfirmasi Kedatangan di Tujuan</CardTitle>
+                <CardTitle className="text-base">Laporan Perjalanan Dinas</CardTitle>
             </CardHeader>
             <CardContent>
                 <form onSubmit={submit}>
                     <FieldGroup>
                         <p className="text-sm text-muted-foreground">
-                            Isi data pejabat yang menerima Anda di tempat tujuan. Data ini dicetak pada kolom &quot;Kepala&quot; di sisi belakang SPPD.
+                            Tuliskan rangkuman/intisari yang Anda dapat selama perjalanan dinas, lalu lampirkan foto-foto dokumentasi. Laporan ini hanya tampil di
+                            sistem dan tidak dicetak pada SPPD.
                         </p>
-                        <div className="grid gap-4 sm:grid-cols-2">
-                            <Field>
-                                <FieldLabel htmlFor="pejabat_nama">Nama Pejabat Penerima</FieldLabel>
-                                <Input id="pejabat_nama" value={data.pejabat_nama} onChange={(e) => setData('pejabat_nama', e.target.value)} />
-                                <FieldError errors={err(errors.pejabat_nama)} />
-                            </Field>
-                            <Field>
-                                <FieldLabel htmlFor="pejabat_jabatan">Jabatan Pejabat</FieldLabel>
-                                <Input id="pejabat_jabatan" value={data.pejabat_jabatan} onChange={(e) => setData('pejabat_jabatan', e.target.value)} />
-                                <FieldError errors={err(errors.pejabat_jabatan)} />
-                            </Field>
-                        </div>
-                        <div className="grid gap-4 sm:grid-cols-2">
-                            <Field>
-                                <FieldLabel htmlFor="tiba_tanggal">Tanggal Tiba</FieldLabel>
-                                <DatePicker id="tiba_tanggal" value={data.tiba_tanggal} onChange={(v) => setData('tiba_tanggal', v)} />
-                                <FieldError errors={err(errors.tiba_tanggal)} />
-                            </Field>
-                            <Field>
-                                <FieldLabel htmlFor="berangkat_tanggal">Tanggal Berangkat dari Tujuan</FieldLabel>
-                                <DatePicker id="berangkat_tanggal" value={data.berangkat_tanggal} onChange={(v) => setData('berangkat_tanggal', v)} />
-                                <FieldError errors={err(errors.berangkat_tanggal)} />
-                            </Field>
-                        </div>
                         <Field>
-                            <FieldLabel htmlFor="bukti">Bukti Kedatangan (opsional)</FieldLabel>
-                            <Input id="bukti" type="file" accept="application/pdf,image/*" onChange={(e) => setData('bukti', e.target.files?.[0] ?? null)} />
-                            <FieldDescription>Foto/scan surat tugas yang distempel, PDF atau gambar maks. 5 MB.</FieldDescription>
-                            <FieldError errors={err(errors.bukti)} />
+                            <FieldLabel htmlFor="ringkasan">Rangkuman / Intisari</FieldLabel>
+                            <Textarea
+                                id="ringkasan"
+                                rows={8}
+                                maxLength={5000}
+                                value={data.ringkasan}
+                                onChange={(e) => setData('ringkasan', e.target.value)}
+                                placeholder="Apa yang dibahas, hasil, dan tindak lanjut untuk sekolah"
+                            />
+                            <FieldDescription>{data.ringkasan.length}/5000 karakter</FieldDescription>
+                            <FieldError errors={errors.ringkasan ? [{ message: errors.ringkasan }] : undefined} />
                         </Field>
+
+                        <Field>
+                            <FieldLabel htmlFor="fotos">Foto Dokumentasi</FieldLabel>
+
+                            {fotoLama.length > 0 && (
+                                <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+                                    {fotoLama.map((foto) => {
+                                        const dihapus = data.hapus_foto_ids.includes(foto.id);
+                                        return (
+                                            <div key={foto.id} className="flex flex-col gap-1">
+                                                <img
+                                                    src={`/uploads/${foto.path}`}
+                                                    alt={foto.nama_asli ?? 'Foto dokumentasi'}
+                                                    className={`aspect-video w-full rounded-md border object-cover ${dihapus ? 'opacity-40' : ''}`}
+                                                />
+                                                <Button type="button" size="sm" variant={dihapus ? 'secondary' : 'outline'} onClick={() => toggleHapus(foto.id)}>
+                                                    {dihapus ? 'Batal hapus' : 'Hapus'}
+                                                </Button>
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                            )}
+
+                            {data.fotos.length > 0 && (
+                                <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+                                    {data.fotos.map((file, index) => (
+                                        <div key={`${file.name}-${index}`} className="flex flex-col gap-1">
+                                            <img src={previews[index]} alt={file.name} className="aspect-video w-full rounded-md border object-cover" />
+                                            <Button type="button" size="sm" variant="outline" onClick={() => setData('fotos', data.fotos.filter((_, i) => i !== index))}>
+                                                Buang
+                                            </Button>
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+
+                            <Input
+                                id="fotos"
+                                type="file"
+                                accept="image/jpeg,image/png,image/webp"
+                                multiple
+                                value=""
+                                onChange={(e) => tambahFoto(e.target.files)}
+                            />
+                            <FieldDescription>
+                                Wajib minimal 1 foto, maksimal 10 foto (JPG, PNG, atau WebP, tiap foto maks. 5 MB). Terpilih: {totalFoto} foto.
+                            </FieldDescription>
+                            <FieldError errors={fotoErrors.length ? fotoErrors : undefined} />
+                        </Field>
+
                         <Button type="submit" className="w-fit" disabled={processing}>
-                            {processing ? 'Menyimpan...' : kedatangan ? 'Perbarui Konfirmasi' : 'Konfirmasi Kedatangan'}
+                            {processing ? 'Menyimpan...' : laporan ? 'Perbarui Laporan' : 'Simpan Laporan'}
                         </Button>
                     </FieldGroup>
                 </form>
@@ -293,13 +359,38 @@ function KedatanganPanel({ pengajuan, kedatangan, defaults }: { pengajuan: Penga
     );
 }
 
+function LaporanCard({ laporan }: { laporan: Laporan }) {
+    return (
+        <Card>
+            <CardHeader>
+                <CardTitle className="text-base">Laporan Perjalanan Dinas</CardTitle>
+            </CardHeader>
+            <CardContent className="flex flex-col gap-3">
+                <DetailField label="Rangkuman / Intisari">
+                    <span className="whitespace-pre-wrap">{laporan.ringkasan}</span>
+                </DetailField>
+                {laporan.fotos.length > 0 && (
+                    <DetailField label={`Foto Dokumentasi (${laporan.fotos.length})`}>
+                        <FotoGrid fotos={laporan.fotos} />
+                    </DetailField>
+                )}
+                <p className="text-xs text-muted-foreground">
+                    Diisi oleh {laporan.penulis ?? '-'} &middot; diperbarui {new Date(laporan.diperbarui_at).toLocaleString('id-ID')}
+                </p>
+            </CardContent>
+        </Card>
+    );
+}
+
 export default function Show() {
-    const { pengajuan, riwayat, can, kedatangan, kedatanganDefault } = usePage<Props>().props;
+    const { pengajuan, riwayat, can, laporan } = usePage<Props>().props;
+    const { confirm, confirmDialog } = useConfirm();
     const badge = statusBadge(pengajuan.status);
 
     return (
         <>
             <Head title={`Pengajuan #${pengajuan.id}`} />
+            {confirmDialog}
 
             <div className="flex flex-col gap-4">
                 <div className="flex flex-wrap items-center justify-between gap-3">
@@ -350,18 +441,6 @@ export default function Show() {
                                 )}
                                 {pengajuan.catatan_kepsek && <DetailField label="Catatan Kepala Sekolah">{pengajuan.catatan_kepsek}</DetailField>}
                                 {pengajuan.penyetuju && <DetailField label="Disetujui oleh">{pengajuan.penyetuju.name}</DetailField>}
-                                {pengajuan.tte_kode && (
-                                    <DetailField label="Tanda Tangan Elektronik (TTE)">
-                                        <a
-                                            href={route('sppd.tte.verifikasi', pengajuan.tte_kode)}
-                                            target="_blank"
-                                            rel="noreferrer"
-                                            className="text-primary hover:underline"
-                                        >
-                                            Buka halaman verifikasi
-                                        </a>
-                                    </DetailField>
-                                )}
 
                                 {pengajuan.sppd && (
                                     <div className="flex flex-wrap gap-2 border-t pt-4">
@@ -377,31 +456,9 @@ export default function Show() {
 
                         {can.terbitkanSppd && <TerbitkanPanel pengajuan={pengajuan} />}
 
-                        {can.konfirmasiKedatangan && (
-                            <KedatanganPanel pengajuan={pengajuan} kedatangan={kedatangan} defaults={kedatanganDefault} />
-                        )}
+                        {can.isiLaporan && <LaporanPanel pengajuan={pengajuan} laporan={laporan} />}
 
-                        {kedatangan && !can.konfirmasiKedatangan && (
-                            <Card>
-                                <CardHeader>
-                                    <CardTitle className="text-base">Kedatangan di Tujuan</CardTitle>
-                                </CardHeader>
-                                <CardContent className="grid gap-3 sm:grid-cols-2">
-                                    <DetailField label="Pejabat Penerima">
-                                        {kedatangan.pejabat_nama} ({kedatangan.pejabat_jabatan})
-                                    </DetailField>
-                                    <DetailField label="Tiba">{formatDate(kedatangan.tiba_tanggal)}</DetailField>
-                                    <DetailField label="Berangkat dari Tujuan">{formatDate(kedatangan.berangkat_tanggal)}</DetailField>
-                                    {kedatangan.bukti_path && (
-                                        <DetailField label="Bukti">
-                                            <a href={`/uploads/${kedatangan.bukti_path}`} target="_blank" rel="noreferrer" className="text-primary hover:underline">
-                                                Lihat bukti
-                                            </a>
-                                        </DetailField>
-                                    )}
-                                </CardContent>
-                            </Card>
-                        )}
+                        {laporan && !can.isiLaporan && <LaporanCard laporan={laporan} />}
 
                         {can.cairkanUangMuka && <UangMukaPanel pengajuan={pengajuan} />}
 
@@ -417,10 +474,13 @@ export default function Show() {
                                     <Button
                                         type="button"
                                         className="w-fit"
-                                        onClick={() => {
-                                            if (window.confirm('Tandai perjalanan dinas ini selesai dan arsipkan?')) {
-                                                router.post(route('sppd.pengajuan.selesai', pengajuan.id));
-                                            }
+                                        onClick={async () => {
+                                            const ok = await confirm({
+                                                title: 'Tandai perjalanan dinas ini selesai?',
+                                                description: 'Dokumen akan diarsipkan dan laporan perjalanan tidak bisa diubah lagi.',
+                                                confirmLabel: 'Tandai Selesai',
+                                            });
+                                            if (ok) router.post(route('sppd.pengajuan.selesai', pengajuan.id));
                                         }}
                                     >
                                         Tandai Selesai & Arsipkan

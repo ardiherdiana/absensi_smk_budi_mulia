@@ -3,6 +3,7 @@ import { useForm } from "@inertiajs/react"
 import { toast } from "sonner"
 
 import { api } from "@/lib/api"
+import { useConfirm } from "@/hooks/use-confirm"
 import type { JadwalHari, Settings } from "@/lib/types"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
@@ -28,6 +29,7 @@ interface Props {
 }
 
 export function PengaturanPage({ settings, jadwal: initialJadwal }: Props) {
+  const { confirm, confirmDialog } = useConfirm()
   const { data, setData, patch, processing, errors } = useForm({
     namaSekolah: settings.namaSekolah,
   })
@@ -130,16 +132,15 @@ export function PengaturanPage({ settings, jadwal: initialJadwal }: Props) {
     await applyJadwalUpdates(changed, "Jadwal berhasil disimpan")
   }
 
-  function handleApplyToAllDays(sourceHari: number) {
+  async function handleApplyToAllDays(sourceHari: number) {
     const source = jadwal.find((r) => r.hari === sourceHari)
     if (!source) return
-    if (
-      !window.confirm(
-        `Terapkan jam-jam di ${HARI_LABEL[sourceHari]} ke semua hari lain? Status Aktif tiap hari tidak ikut berubah.`
-      )
-    ) {
-      return
-    }
+    const ok = await confirm({
+      title: `Terapkan jam ${HARI_LABEL[sourceHari]} ke semua hari lain?`,
+      description: "Status Aktif tiap hari tidak ikut berubah.",
+      confirmLabel: "Terapkan",
+    })
+    if (!ok) return
 
     setJadwal((rows) =>
       rows.map((r) =>
@@ -160,13 +161,13 @@ export function PengaturanPage({ settings, jadwal: initialJadwal }: Props) {
   }
 
   async function handleResetJadwal() {
-    if (
-      !window.confirm(
-        "Reset jadwal mingguan ke pengaturan default? Semua jam dan status aktif yang sudah dikustomisasi akan hilang."
-      )
-    ) {
-      return
-    }
+    const ok = await confirm({
+      title: "Reset jadwal mingguan ke pengaturan default?",
+      description: "Semua jam dan status aktif yang sudah dikustomisasi akan hilang.",
+      confirmLabel: "Reset",
+      destructive: true,
+    })
+    if (!ok) return
     await applyJadwalUpdates(
       jadwal.map((row) => defaultJadwalRow(row.hari)),
       "Jadwal berhasil direset ke default"
@@ -175,6 +176,7 @@ export function PengaturanPage({ settings, jadwal: initialJadwal }: Props) {
 
   return (
     <div className="flex flex-col gap-4">
+      {confirmDialog}
       <div>
         <h1 className="text-xl font-semibold">Pengaturan</h1>
         <p className="text-sm text-muted-foreground">Identitas sekolah dan jadwal kehadiran</p>
