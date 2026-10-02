@@ -44,7 +44,7 @@ interface Pengajuan {
     jam_berangkat: string;
     tanggal_kembali: string;
     jam_kembali: string;
-    undangan_path: string;
+    undangan_path: string | null;
     catatan_kepsek: string | null;
     tte_kode: string | null;
     alat_angkutan: string | null;
@@ -341,11 +341,13 @@ export default function Show() {
                                         ? '-'
                                         : pengajuan.pengikuts.map((p) => (p.jabatan ? `${p.name} (${p.jabatan})` : p.name)).join(', ')}
                                 </DetailField>
-                                <DetailField label="Surat Undangan">
-                                    <a href={`/uploads/${pengajuan.undangan_path}`} target="_blank" rel="noreferrer" className="text-primary hover:underline">
-                                        Lihat undangan
-                                    </a>
-                                </DetailField>
+                                {pengajuan.undangan_path && (
+                                    <DetailField label="Surat Undangan">
+                                        <a href={`/uploads/${pengajuan.undangan_path}`} target="_blank" rel="noreferrer" className="text-primary hover:underline">
+                                            Lihat undangan
+                                        </a>
+                                    </DetailField>
+                                )}
                                 {pengajuan.catatan_kepsek && <DetailField label="Catatan Kepala Sekolah">{pengajuan.catatan_kepsek}</DetailField>}
                                 {pengajuan.penyetuju && <DetailField label="Disetujui oleh">{pengajuan.penyetuju.name}</DetailField>}
                                 {pengajuan.tte_kode && (

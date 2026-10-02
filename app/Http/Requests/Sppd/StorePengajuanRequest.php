@@ -39,7 +39,7 @@ class StorePengajuanRequest extends FormRequest
             'jam_berangkat' => ['required', 'date_format:H:i'],
             'tanggal_kembali' => ['required', 'date', 'after_or_equal:tanggal_berangkat'],
             'jam_kembali' => ['required', 'date_format:H:i', Rule::when($satuHari, ['after:jam_berangkat'])],
-            'undangan' => ['required', 'file', 'mimes:pdf,jpg,jpeg,png', 'max:5120'],
+            'undangan' => ['nullable', 'file', 'mimes:pdf,jpg,jpeg,png', 'max:5120'],
         ];
     }
 

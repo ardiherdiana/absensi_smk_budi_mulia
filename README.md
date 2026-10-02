@@ -2,19 +2,18 @@
 
 Sistem absensi guru berbasis web untuk **SMK Budi Mulia, Karawang**. Guru absen masuk dan pulang lewat QR di perangkat scan sekolah (kiosk) atau lewat peramban dengan pemeriksaan lokasi. Admin dan kepala sekolah memantau rekap kehadiran, menyetujui izin dan sakit, dan mengatur jadwal. Aplikasinya bisa dipasang sebagai PWA dan mengirim pengingat lewat Web Push.
 
-Satu repo dan satu basis data (`absensi_laravel`) memuat tiga bagian:
+Satu repo dan satu basis data (`absensi_laravel`) memuat dua bagian:
 
 | Bagian | Alamat | Untuk siapa | Keterangan |
 | --- | --- | --- | --- |
 | Absensi (inti) | `/absen/dashboard` dan halaman lain di akar | `ADMIN`, `GURU`, `KEPSEK` | Absen QR dan web, briefing pagi, izin/sakit, rekap, jadwal, hari libur, notifikasi |
 | SPPD | `/sppd/...` | Pemohon, kepala sekolah, TU, bendahara | Surat perintah perjalanan dinas: pengajuan, persetujuan dengan tanda tangan elektronik, penerbitan, uang muka, laporan. Ditandai "Sedang dalam pengembangan" di menu utama |
-| API SIMAK | `/api/pguru/...` | Aplikasi Android SIMAK (`../perangkat-guru`) | Nilai siswa dan lembar supervisi guru. Akun terpisah dari `users` |
 
 Setelah masuk, pengguna tiba di **Menu Utama** (`/menu-utama`) untuk memilih Absen atau SPPD.
 
 ## Fitur utama (absensi)
 
-- **Absen lewat kiosk** - admin masuk di komputer sekolah dengan alat scan; guru menunjukkan QR pribadinya (permanen, dari HP atau kartu cetak) ke alat itu untuk absen masuk dan pulang. Terlambat atau tidak ditentukan otomatis dari jadwal hari itu.
+- **Absen lewat kiosk** - admin masuk di komputer/tablet sekolah; guru menunjukkan QR pribadinya (permanen, dari HP atau kartu cetak) ke kamera perangkat itu untuk absen masuk dan pulang. Terlambat atau tidak ditentukan otomatis dari jadwal hari itu.
 - **Absen lewat web** - guru menekan tombol di peramban; server menerima koordinat dan menolak bila lebih dari 100 m dari sekolah.
 - **Absen briefing** - sesi terpisah untuk briefing pagi, dipindai admin lewat kamera, dengan jam mulai dan selesai per hari.
 - **Multi-role**: `ADMIN`, `GURU`, `KEPSEK` (kepala sekolah), masing-masing dengan menu sendiri.
@@ -30,8 +29,8 @@ Setelah masuk, pengguna tiba di **Menu Utama** (`/menu-utama`) untuk memilih Abs
 | Backend | Laravel 13, PHP 8.3+, MySQL |
 | Frontend | React 19 + TypeScript, Inertia.js v3, Tailwind CSS v4, shadcn/ui |
 | Build | Vite |
-| Autentikasi | Sesi (web), Sanctum (API SIMAK), spatie/laravel-permission (peran SPPD) |
-| Lainnya | PhpSpreadsheet (Excel), dompdf (PDF), minishlink/web-push (push), Resend (email kode SIMAK) |
+| Autentikasi | Sesi (web), spatie/laravel-permission (peran SPPD) |
+| Lainnya | PhpSpreadsheet (Excel), dompdf (PDF), minishlink/web-push (push) |
 
 ## Persyaratan
 
@@ -63,7 +62,6 @@ Variabel `.env` yang perlu diperhatikan:
 | `INERTIA_ENCRYPT_HISTORY=true` | **Wajib `true` di semua lingkungan.** Mencegah tombol kembali menampilkan halaman lama (form masuk basi atau dashboard akun lain) dari riwayat Inertia setelah masuk atau keluar |
 | `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, `VAPID_SUBJECT` | Web Push. Buat dengan `php artisan webpush:vapid`. Kosong berarti push mati tanpa galat |
 | `OPENSSL_CONF` | Hanya di Windows bila push gagal diam-diam; arahkan ke `openssl.cnf` milik Git for Windows |
-| `SANCTUM_EXPIRATION` | Masa berlaku token API SIMAK (menit), bawaan 90 hari. API SIMAK memakai akun `users` yang sama dengan web; `PGURU_MAIL_*` dan `RESEND_API_KEY` tidak dipakai lagi |
 | `TTE_SECRET` | Kunci tanda tangan elektronik SPPD. Kosong berarti memakai `APP_KEY`. Belum ada di `.env.example` |
 
 Pengingat absen memakai penjadwal Laravel (`attendance:send-reminders` tiap menit). Di server, pasang cron `* * * * * php artisan schedule:run`.
@@ -95,19 +93,18 @@ Tidak ada uji otomatis untuk frontend; `tsc -b` dan ESLint adalah satu-satunya p
 ## Struktur
 
 ```
-app/Http/Controllers/       Admin/, Auth/, Guru/, Sppd/, Pguru/ dan controller absensi di akar
-app/Http/Middleware/        RequireRole (role:), HandleInertiaRequests, PreventBackHistoryCache, Sppd/, Pguru/
-app/Models/                 model absensi di akar, Sppd/, Pguru/
-app/Services/               logika bisnis (AttendanceService, BriefingService, LeaveService, ...), Sppd/, Pguru/
-app/Support/                Geofence, XlsxExport, Pguru/
-app/Console/Commands/       SendAttendanceReminders, PguruBuatAdmin
+app/Http/Controllers/       Admin/, Auth/, Guru/, Sppd/ dan controller absensi di akar
+app/Http/Middleware/        RequireRole (role:), HandleInertiaRequests, PreventBackHistoryCache, Sppd/
+app/Models/                 model absensi di akar, Sppd/
+app/Services/               logika bisnis (AttendanceService, BriefingService, LeaveService, ...), Sppd/
+app/Support/                Geofence, XlsxExport
+app/Console/Commands/       SendAttendanceReminders
 database/migrations|seeders|factories
-routes/                     web.php (absensi + SPPD), api.php (Pguru), console.php (penjadwal)
+routes/                     web.php (absensi + SPPD), console.php (penjadwal)
 resources/js/               main.tsx, pages/, layouts/, components/ (ui/ = shadcn), lib/, context/, types/
-resources/views/            app.blade.php, pdf/ (SPPD, laporan, supervisi), mail/
-resources/pguru/            template xlsx dan docx untuk API SIMAK
+resources/views/            app.blade.php, pdf/ (SPPD, laporan), mail/
 public/                     sw.js, manifest.json, ikon PWA, logo_smk.png
-tests/                      Feature/ (Admin, Attendance, Auth, Briefing, Leave, Middleware, Sppd, Pguru, ...) dan Unit/
+tests/                      Feature/ (Admin, Attendance, Auth, Briefing, Leave, Middleware, Sppd, ...) dan Unit/
 md/                         dokumen proyek (tidak masuk git)
 ```
 
@@ -118,13 +115,13 @@ Dokumen proyek ada di folder `md/` (lokal, tidak ikut git):
 | Berkas | Isi |
 | --- | --- |
 | `md/PRD.md` | Tujuan, pengguna, ruang lingkup, kebutuhan fungsional per bagian, aturan bisnis, status dan risiko |
-| `md/ARCHITECTURE.md` | Alur permintaan, peran dan otorisasi, frontend, domain kehadiran, data, modul SPPD dan API SIMAK, konfigurasi |
+| `md/ARCHITECTURE.md` | Alur permintaan, peran dan otorisasi, frontend, domain kehadiran, data, modul SPPD, konfigurasi |
 | `md/DESIGN_SYSTEM.md` | Token warna terang/gelap, cara kerja tema, komponen, kontras terukur |
 | `md/SECURITY.md` | Data yang dilindungi, kontrol yang ada, celah yang diketahui, daftar periksa rilis |
 | `md/CODE_STYLE.md` | Konvensi PHP dan TypeScript, model dan migrasi, galat, komentar |
 | `md/TESTING.md` | Pemeriksaan statis, tes PHPUnit per area, daftar uji manual, yang belum diuji |
 
-Petunjuk untuk asisten pemrograman ada di `AGENTS.md` dan `CLAUDE.md` (akar repo). Aplikasi Android SIMAK punya dokumen sendiri di `../perangkat-guru/md/`.
+Petunjuk untuk asisten pemrograman ada di `AGENTS.md` dan `CLAUDE.md` (akar repo). SIMAK (nilai siswa dan supervisi guru) adalah proyek terpisah di `../simak`.
 
 ## Catatan keamanan
 

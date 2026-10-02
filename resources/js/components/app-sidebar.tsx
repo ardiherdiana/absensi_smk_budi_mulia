@@ -11,7 +11,6 @@ import {
   QrCode,
   ScanLine,
   Settings,
-  User,
   Users,
 } from "lucide-react"
 
@@ -74,7 +73,6 @@ const adminNav: NavGroup[] = [
     label: "Sistem",
     items: [
       { title: "Notifikasi", url: NOTIFIKASI_URL, icon: Bell },
-      { title: "Profil Saya", url: "/profil", icon: User },
       { title: "Pengaturan", url: "/pengaturan", icon: Settings },
     ],
   },
@@ -89,7 +87,6 @@ const guruNav: NavGroup[] = [
       { title: "QR Saya", url: "/qr", icon: QrCode },
       { title: "Riwayat Absensi", url: "/riwayat", icon: ClipboardList },
       { title: "Izin & Sakit", url: "/izin", icon: FileText },
-      { title: "Profil Saya", url: "/profil", icon: User },
     ],
   },
 ]
@@ -103,7 +100,6 @@ const kepsekNav: NavGroup[] = [
       { title: "QR Saya", url: "/qr", icon: QrCode },
       { title: "Riwayat Absensi", url: "/riwayat", icon: ClipboardList },
       { title: "Izin & Sakit Saya", url: "/izin", icon: FileText },
-      { title: "Profil Saya", url: "/profil", icon: User },
     ],
   },
   {

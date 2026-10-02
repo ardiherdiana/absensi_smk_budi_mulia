@@ -105,8 +105,7 @@
 # Laporan magang beserta PDF referensi pihak ketiga (belasan MB).
 /laporan
 
-# Berkas kunci sementara Word/Excel (~$nama.docx). Templat resmi di
-# resources/pguru/ sering dibuka di Office, dan kuncinya bisa ikut ter-add.
+# Berkas kunci sementara Word/Excel (~$nama.docx) yang dibuat Office saat dokumen dibuka.
 ~$*
 
 # ---------------------------------------------------------------------------

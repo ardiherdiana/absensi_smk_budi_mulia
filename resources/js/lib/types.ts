@@ -118,12 +118,15 @@ export interface JadwalHari {
 }
 
 export interface CheckinResult {
-  type: "MASUK" | "PULANG"
+  /** BRIEFING: scan kiosk dari guru yang sudah absen masuk, saat briefing berlangsung (hanya lewat kiosk). */
+  type: "MASUK" | "PULANG" | "BRIEFING"
   statusMasuk?: StatusKehadiran
   jam: string
   attendance: Attendance
   nama: string
   fotoUrl: string | null
+  /** Scan kiosk ini mencatat absen briefing (MASUK saat briefing berlangsung, atau BRIEFING). */
+  briefing?: boolean
 }
 
 export interface BriefingCheckinResult {

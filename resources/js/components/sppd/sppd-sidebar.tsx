@@ -1,5 +1,5 @@
 import * as React from 'react';
-import { Link, router, usePage } from '@inertiajs/react';
+import { Link, usePage } from '@inertiajs/react';
 import {
     BellIcon,
     ClipboardListIcon,
@@ -7,7 +7,6 @@ import {
     HomeIcon,
     LayoutDashboardIcon,
     LayoutTemplateIcon,
-    LogOutIcon,
     PenLineIcon,
     UsersIcon,
 } from 'lucide-react';
@@ -98,10 +97,6 @@ export function SppdSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) 
 
     groups.push({ label: 'Sistem', items: sistem });
 
-    function logout() {
-        router.post(route('logout'));
-    }
-
     return (
         <Sidebar {...props}>
             <SidebarHeader>
@@ -152,12 +147,6 @@ export function SppdSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) 
                         <div className="flex items-center justify-between gap-2 px-2 py-1.5 text-sm">
                             <span className="truncate font-medium">{isAdmin ? 'Admin' : auth.user?.name}</span>
                         </div>
-                    </SidebarMenuItem>
-                    <SidebarMenuItem>
-                        <SidebarMenuButton onClick={logout}>
-                            <LogOutIcon />
-                            Keluar
-                        </SidebarMenuButton>
                     </SidebarMenuItem>
                 </SidebarMenu>
             </SidebarFooter>

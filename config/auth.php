@@ -42,13 +42,6 @@ return [
             'driver' => 'session',
             'provider' => 'users',
         ],
-
-        // Aplikasi mobile SIMAK (/api/pguru): token Sanctum untuk akun `users` yang sama dengan login web absensi.
-        // Guard ini hanya menerima token, bukan cookie sesi (lihat config/sanctum.php: `guard => []`).
-        'pguru' => [
-            'driver' => 'sanctum',
-            'provider' => 'users',
-        ],
     ],
 
     /*

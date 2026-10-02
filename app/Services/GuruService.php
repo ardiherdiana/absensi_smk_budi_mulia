@@ -9,16 +9,16 @@ use Illuminate\Support\Facades\Hash;
 class GuruService
 {
     /** Username is auto-derived from the teacher's own name (first two
-     * words, lowercased, dot-joined - e.g. "Rio Falentino, S.Pd. Gr." ->
-     * "rio.falentino") rather than a manually-assigned NIP, since there's no
-     * other per-teacher identifier collected at creation time. Suffixed with
-     * an incrementing number on collision. */
+     * words, lowercased, joined with no separator - e.g. "Rio Falentino,
+     * S.Pd. Gr." -> "riofalentino") rather than a manually-assigned NIP,
+     * since there's no other per-teacher identifier collected at creation
+     * time. Suffixed with an incrementing number on collision. */
     private function baseUsernameFromNama(string $nama): string
     {
         $core = trim(explode(',', $nama)[0] ?? $nama);
         $words = array_slice(array_values(array_filter(preg_split('/\s+/', $core))), 0, 2);
-        $slug = strtolower(implode('.', $words));
-        $slug = preg_replace('/[^a-z0-9.]/', '', $slug);
+        $slug = strtolower(implode('', $words));
+        $slug = preg_replace('/[^a-z0-9]/', '', $slug);
 
         return $slug !== '' ? $slug : 'guru';
     }

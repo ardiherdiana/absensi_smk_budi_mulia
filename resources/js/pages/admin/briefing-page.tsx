@@ -1,10 +1,9 @@
 import * as React from "react"
-import { Html5Qrcode, Html5QrcodeScannerState } from "html5-qrcode"
 import { toast } from "sonner"
-import { Clock, Download, Pencil } from "lucide-react"
+import { Download, Pencil } from "lucide-react"
 
 import { api, ApiError, downloadFile } from "@/lib/api"
-import type { BriefingCheckinResult, BriefingRekapRow, Guru, StatusKehadiran } from "@/lib/types"
+import type { BriefingRekapRow, Guru, StatusKehadiran } from "@/lib/types"
 import {
   STATUS_OPTIONS,
   formatJam,
@@ -14,7 +13,6 @@ import {
 } from "@/lib/attendance-format"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent } from "@/components/ui/card"
 import { DataPagination } from "@/components/data-pagination"
 import { DatePicker } from "@/components/date-picker"
 import { GuruCombobox } from "@/components/guru-combobox"
@@ -44,30 +42,13 @@ import {
   TableRow,
 } from "@/components/ui/table"
 
-const READER_ID = "briefing-qr-reader"
-const SAME_TOKEN_COOLDOWN_MS = 4000
-
-type CameraStatus = "starting" | "scanning" | "error"
+const REFRESH_INTERVAL_MS = 10_000
 
 interface Props {
   guruList: Guru[]
   rows: BriefingRekapRow[]
   from: string
   to: string
-  /** null = tidak ada jadwal briefing hari ini (hari libur atau memang tidak
-   * dicentang di Pengaturan). */
-  jamBriefing: string | null
-  /** null = tidak ada gerbang penutup - absen briefing tetap terbuka
-   * sampai akhir hari begitu jamBriefing kebuka. */
-  jamSelesaiBriefing: string | null
-}
-
-/** Whether `hhmm` ("HH:mm") has been reached yet today, as of `now`. */
-function isTimeReached(hhmm: string, now: Date): boolean {
-  const [hour, minute] = hhmm.split(":").map(Number)
-  const gate = new Date(now)
-  gate.setHours(hour, minute, 0, 0)
-  return now >= gate
 }
 
 export function BriefingPage({
@@ -75,24 +56,7 @@ export function BriefingPage({
   rows: initialRows,
   from: initialFrom,
   to: initialTo,
-  jamBriefing,
-  jamSelesaiBriefing,
 }: Props) {
-  const [cameraStatus, setCameraStatus] = React.useState<CameraStatus>("starting")
-  const [cameraError, setCameraError] = React.useState<string | null>(null)
-  const scannerRef = React.useRef<Html5Qrcode | null>(null)
-  const busyRef = React.useRef(false)
-  const lastTokenRef = React.useRef<{ token: string; at: number } | null>(null)
-
-  const [now, setNow] = React.useState(() => new Date())
-  React.useEffect(() => {
-    const timer = setInterval(() => setNow(new Date()), 15_000)
-    return () => clearInterval(timer)
-  }, [])
-  const isBriefingOpen = jamBriefing !== null && isTimeReached(jamBriefing, now)
-  const isBriefingClosed = jamSelesaiBriefing !== null && isTimeReached(jamSelesaiBriefing, now)
-  const isBriefingActive = isBriefingOpen && !isBriefingClosed
-
   const [guruId, setGuruId] = React.useState<string>("all")
   const [from, setFrom] = React.useState(initialFrom)
   const [to, setTo] = React.useState(initialTo)
@@ -111,17 +75,40 @@ export function BriefingPage({
   const [editSaving, setEditSaving] = React.useState(false)
   const [editError, setEditError] = React.useState<string | null>(null)
 
-  const loadRows = React.useCallback(() => {
-    setLoading(true)
-    api
-      .get<BriefingRekapRow[]>("/briefing/rekap", {
-        from,
-        to,
-        guruId: guruId === "all" ? undefined : guruId,
-      })
-      .then(setRows)
-      .finally(() => setLoading(false))
-  }, [from, to, guruId])
+  // Hanya jawaban permintaan terbaru yang dipakai: penyegaran otomatis yang terlambat
+  // tiba tidak boleh menimpa hasil filter yang baru diganti.
+  const latestRequestRef = React.useRef(0)
+  const loadRows = React.useCallback(
+    (silent = false) => {
+      const requestId = ++latestRequestRef.current
+      if (!silent) setLoading(true)
+      api
+        .get<BriefingRekapRow[]>("/briefing/rekap", {
+          from,
+          to,
+          guruId: guruId === "all" ? undefined : guruId,
+        })
+        .then((result) => {
+          if (requestId === latestRequestRef.current) setRows(result)
+        })
+        .catch((err) => {
+          if (!silent) throw err
+        })
+        .finally(() => {
+          if (requestId === latestRequestRef.current) setLoading(false)
+        })
+    },
+    [from, to, guruId]
+  )
+
+  // Scan di kiosk masuk ke tabel yang sama dari layar lain, jadi tabel disegarkan sendiri
+  // selama halaman ini terlihat.
+  React.useEffect(() => {
+    const timer = setInterval(() => {
+      if (document.visibilityState === "visible") loadRows(true)
+    }, REFRESH_INTERVAL_MS)
+    return () => clearInterval(timer)
+  }, [loadRows])
 
   const isFirstLoad = React.useRef(true)
   React.useEffect(() => {
@@ -131,85 +118,7 @@ export function BriefingPage({
     }
     loadRows()
     setPage(1)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [loadRows])
-
-  async function handleScan(qrToken: string) {
-    const token = qrToken.trim()
-    if (!token) return
-
-    const nowMs = Date.now()
-    if (lastTokenRef.current?.token === token && nowMs - lastTokenRef.current.at < SAME_TOKEN_COOLDOWN_MS) {
-      return
-    }
-    if (busyRef.current) return
-    busyRef.current = true
-    lastTokenRef.current = { token, at: nowMs }
-
-    try {
-      const result = await api.post<BriefingCheckinResult>("/briefing/scan", { qrToken: token })
-      toast.success(`${result.nama} berhasil absen briefing`)
-      loadRows()
-    } catch (err) {
-      toast.error(err instanceof ApiError ? err.message : "Gagal memproses scan")
-    } finally {
-      busyRef.current = false
-    }
-  }
-
-  React.useEffect(() => {
-    if (!isBriefingActive) return
-
-    let cancelled = false
-    const scanner = new Html5Qrcode(READER_ID)
-    scannerRef.current = scanner
-
-    function stopIfRunning() {
-      const state = scanner.getState()
-      if (state === Html5QrcodeScannerState.SCANNING || state === Html5QrcodeScannerState.PAUSED) {
-        return scanner.stop().catch(() => {}).finally(() => scanner.clear())
-      }
-      return Promise.resolve()
-    }
-
-    async function start() {
-      setCameraStatus("starting")
-      setCameraError(null)
-      try {
-        await scanner.start(
-          { facingMode: "environment" },
-          { fps: 10, qrbox: { width: 260, height: 260 } },
-          (decodedText) => {
-            void handleScan(decodedText)
-          },
-          () => {
-            // per-frame decode failure, ignore
-          }
-        )
-        if (cancelled) {
-          void stopIfRunning()
-          return
-        }
-        setCameraStatus("scanning")
-      } catch {
-        if (!cancelled) {
-          setCameraStatus("error")
-          setCameraError(
-            "Tidak bisa mengakses kamera. Pastikan Anda mengizinkan akses kamera di browser."
-          )
-        }
-      }
-    }
-
-    start()
-
-    return () => {
-      cancelled = true
-      scannerRef.current = null
-      void stopIfRunning()
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isBriefingActive])
 
   async function handleExport() {
     setExporting(true)
@@ -270,46 +179,10 @@ export function BriefingPage({
       <div>
         <h1 className="text-xl font-semibold">Absen Briefing</h1>
         <p className="text-sm text-muted-foreground">
-          Scan QR guru/kepsek satu per satu untuk absen briefing - otomatis kebuka mulai jam
+          Rekap absen briefing guru/kepsek - absen dibuka otomatis mulai jam
           briefing yang diatur di Pengaturan
         </p>
       </div>
-
-      {!isBriefingActive ? (
-        <Card className="mx-auto w-full max-w-sm">
-          <CardContent className="flex flex-col items-center gap-2 py-10 text-center text-muted-foreground">
-            <Clock className="size-8" />
-            <p className="text-sm">
-              {jamBriefing === null
-                ? "Tidak ada jadwal briefing hari ini"
-                : !isBriefingOpen
-                  ? `Belum jam briefing (mulai ${jamBriefing})`
-                  : `Absen briefing sudah ditutup (berakhir jam ${jamSelesaiBriefing})`}
-            </p>
-          </CardContent>
-        </Card>
-      ) : (
-        <>
-          <Card className="mx-auto w-full max-w-sm overflow-hidden py-0">
-            <CardContent className="p-0">
-              <div id={READER_ID} className="aspect-square w-full bg-black" />
-            </CardContent>
-          </Card>
-
-          <div className="text-center text-sm">
-            {cameraStatus === "starting" && (
-              <p className="text-muted-foreground">Memulai kamera...</p>
-            )}
-            {cameraStatus === "error" && <p className="text-destructive">{cameraError}</p>}
-            {cameraStatus === "scanning" && (
-              <p className="text-muted-foreground">
-                Arahkan kamera ke QR guru/kepsek satu per satu - kamera tetap menyala, tinggal
-                lanjut ke orang berikutnya
-              </p>
-            )}
-          </div>
-        </>
-      )}
 
       <div className="flex flex-wrap items-center justify-between gap-3">
         <p className="text-sm text-muted-foreground">

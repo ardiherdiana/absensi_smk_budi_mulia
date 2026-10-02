@@ -18,8 +18,18 @@ class GuruManagementTest extends TestCase
         ]);
 
         $response->assertSessionHas('toast');
-        $this->assertDatabaseHas('users', ['username' => 'budi.santoso', 'role' => 'GURU']);
+        $this->assertDatabaseHas('users', ['username' => 'budisantoso', 'role' => 'GURU']);
         $this->assertDatabaseHas('guru', ['nama' => 'Budi Santoso, S.Pd.']);
+    }
+
+    public function test_username_takes_only_the_first_two_words_without_a_dot(): void
+    {
+        $this->actingAsAdmin();
+
+        $this->post('/data-guru', ['nama' => 'Ardi Herdiana Putra', 'password' => 'rahasia123'])->assertSessionHas('toast');
+
+        $this->assertDatabaseHas('users', ['username' => 'ardiherdiana']);
+        $this->assertDatabaseMissing('users', ['username' => 'ardi.herdiana']);
     }
 
     public function test_username_collision_gets_a_numeric_suffix(): void
@@ -29,8 +39,8 @@ class GuruManagementTest extends TestCase
         $this->post('/data-guru', ['nama' => 'Budi Santoso', 'password' => 'rahasia123'])->assertSessionHas('toast');
         $this->post('/data-guru', ['nama' => 'Budi Santoso', 'password' => 'rahasia123'])->assertSessionHas('toast');
 
-        $this->assertDatabaseHas('users', ['username' => 'budi.santoso']);
-        $this->assertDatabaseHas('users', ['username' => 'budi.santoso2']);
+        $this->assertDatabaseHas('users', ['username' => 'budisantoso']);
+        $this->assertDatabaseHas('users', ['username' => 'budisantoso2']);
     }
 
     public function test_admin_can_update_a_guru(): void

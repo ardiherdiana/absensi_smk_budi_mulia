@@ -70,6 +70,46 @@ class PengajuanSppdWorkflowTest extends TestCase
         $this->assertNotNull($this->kepsek->fresh()->signature_path, 'signature was not saved');
     }
 
+    public function test_pengajuan_tanpa_surat_undangan_diterima(): void
+    {
+        $payload = $this->pengajuanPayload();
+        unset($payload['undangan']);
+
+        $this->actingAs($this->pemohon)->post('/sppd/pengajuan', $payload)->assertSessionHasNoErrors();
+
+        $pengajuan = $this->pemohon->pengajuanSppds()->firstOrFail();
+        $this->assertNull($pengajuan->undangan_path);
+        $this->assertSame(PengajuanStatus::DiajukanKeKepsek, $pengajuan->status);
+    }
+
+    public function test_berangkat_dan_kembali_di_hari_yang_sama_diterima(): void
+    {
+        $tanggal = now()->addDays(3)->toDateString();
+
+        $this->actingAs($this->pemohon)->post('/sppd/pengajuan', $this->pengajuanPayload([
+            'tanggal_berangkat' => $tanggal,
+            'tanggal_kembali' => $tanggal,
+            'jam_berangkat' => '07:30',
+            'jam_kembali' => '15:00',
+        ]))->assertSessionHasNoErrors();
+
+        $this->assertSame(1, $this->pemohon->pengajuanSppds()->count());
+    }
+
+    public function test_kembali_di_hari_yang_sama_harus_setelah_jam_berangkat(): void
+    {
+        $tanggal = now()->addDays(3)->toDateString();
+
+        $this->actingAs($this->pemohon)->post('/sppd/pengajuan', $this->pengajuanPayload([
+            'tanggal_berangkat' => $tanggal,
+            'tanggal_kembali' => $tanggal,
+            'jam_berangkat' => '15:00',
+            'jam_kembali' => '07:30',
+        ]))->assertSessionHasErrors('jam_kembali');
+
+        $this->assertSame(0, $this->pemohon->pengajuanSppds()->count());
+    }
+
     public function test_full_sppd_lifecycle_from_pengajuan_to_selesai(): void
     {
         // 1. Pemohon mengajukan SPPD dengan tujuan diketik sendiri beserta jam berangkat/kembali.

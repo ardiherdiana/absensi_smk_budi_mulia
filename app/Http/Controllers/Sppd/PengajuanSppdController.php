@@ -61,7 +61,7 @@ class PengajuanSppdController extends Controller
 
     public function store(StorePengajuanRequest $request): RedirectResponse
     {
-        $path = $request->file('undangan')->store('undangan', 'public');
+        $path = $request->file('undangan')?->store('undangan', 'public');
 
         $pengajuan = PengajuanSppd::create([
             'pemohon_id' => $request->user()->id,

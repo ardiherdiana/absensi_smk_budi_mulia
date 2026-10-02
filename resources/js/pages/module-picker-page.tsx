@@ -1,5 +1,5 @@
-import { Link, router } from "@inertiajs/react"
-import { ArrowRight, CalendarCheckIcon, LogOut, SendIcon } from "lucide-react"
+import { Link } from "@inertiajs/react"
+import { ArrowRight, CalendarCheckIcon, CircleUserRound, SendIcon } from "lucide-react"
 
 import { useAuth } from "@/context/auth-context"
 import { ThemeToggle } from "@/components/theme-toggle"
@@ -34,10 +34,6 @@ export function ModulePickerPage() {
   const { user } = useAuth()
   const displayName = user?.role === "ADMIN" ? "Admin" : (user?.guru?.nama ?? user?.username)
 
-  function logout() {
-    router.post("/logout")
-  }
-
   return (
     <div className="flex min-h-svh flex-col">
       <header className="flex h-14 shrink-0 items-center justify-between border-b px-4 md:px-6">
@@ -51,9 +47,14 @@ export function ModulePickerPage() {
         <div className="flex items-center gap-3">
           <span className="hidden text-sm text-muted-foreground sm:inline">{displayName}</span>
           <ThemeToggle />
-          <Button variant="ghost" size="sm" onClick={logout}>
-            <LogOut />
-            Keluar
+          <Button
+            variant="ghost"
+            size="icon"
+            render={<Link href="/profil" />}
+            aria-label="Profil saya"
+            title="Profil saya"
+          >
+            <CircleUserRound className="size-5" />
           </Button>
         </div>
       </header>

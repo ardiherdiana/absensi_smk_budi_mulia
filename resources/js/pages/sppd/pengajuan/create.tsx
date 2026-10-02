@@ -25,7 +25,13 @@ interface Props extends SppdPageProps {
     pegawai: Pegawai[];
 }
 
-const fieldError = (message?: string) => (message ? [{ message }] : undefined);
+// new Date('YYYY-MM-DD') dibaca UTC (07.00 WIB) sehingga hari yang sama ikut terkunci; baca sebagai tanggal lokal.
+const parseTanggal = (value: string) => {
+    const [y, m, d] = value.split('-').map(Number);
+    return new Date(y, m - 1, d);
+};
+
+const fieldError =(message?: string) => (message ? [{ message }] : undefined);
 
 function PengikutPicker({ pegawai, value, onChange }: { pegawai: Pegawai[]; value: number[]; onChange: (ids: number[]) => void }) {
     const [query, setQuery] = useState('');
@@ -113,7 +119,7 @@ export default function Create() {
                 <div>
                     <h1 className="text-xl font-semibold">Ajukan SPPD Baru</h1>
                     <p className="text-sm text-muted-foreground">
-                        Isi data perjalanan dinas dan unggah surat undangan untuk diajukan ke Kepala Sekolah
+                        Isi data perjalanan dinas untuk diajukan ke Kepala Sekolah
                     </p>
                 </div>
 
@@ -168,7 +174,7 @@ export default function Create() {
                                             onChange={(value) => setData('tanggal_kembali', value)}
                                             disabled={(date) =>
                                                 data.tanggal_berangkat
-                                                    ? date < new Date(data.tanggal_berangkat)
+                                                    ? date < parseTanggal(data.tanggal_berangkat)
                                                     : date < new Date(new Date().toDateString())
                                             }
                                         />
@@ -235,7 +241,7 @@ export default function Create() {
                                 </Field>
 
                                 <Field>
-                                    <FieldLabel htmlFor="undangan">Surat Undangan</FieldLabel>
+                                    <FieldLabel htmlFor="undangan">Surat Undangan (opsional)</FieldLabel>
                                     <Input
                                         id="undangan"
                                         type="file"

@@ -71,20 +71,62 @@ class BriefingService
             abort(409, "{$guru->nama} sudah absen briefing hari ini");
         }
 
+        $record = $this->simpanScan($guru, $tanggal, $now, $existing);
+
+        return ['nama' => $guru->nama, 'fotoUrl' => $guru->fotoUrl, 'waktu' => $record->waktu];
+    }
+
+    /** Briefing attendance from a scan at the kiosk (the school's scanner
+     * device), for both a guru's first absen-masuk scan and a later scan
+     * after they already checked in: when today's briefing is in progress
+     * (started, not yet closed) and the guru has no scanned briefing yet, the
+     * scan records the briefing. Outside that window - no briefing today, not
+     * started, already closed, or already scanned - it does nothing and never
+     * aborts, so the caller's own check-in logic is unaffected.
+     *
+     * @return bool whether a briefing attendance was recorded by this call */
+    public function catatDariScanKiosk(Guru $guru, Carbon $now): bool
+    {
+        $tanggal = $now->copy()->startOfDay();
+        $jadwalHari = $this->jadwal->getJadwalForDate($tanggal);
+        if (! $jadwalHari->aktif || ! $jadwalHari->jamBriefing) {
+            return false;
+        }
+
+        if ($now->lt(Carbon::parse($tanggal->toDateString().' '.$jadwalHari->jamBriefing))) {
+            return false;
+        }
+        if ($jadwalHari->jamSelesaiBriefing && $now->gt(Carbon::parse($tanggal->toDateString().' '.$jadwalHari->jamSelesaiBriefing))) {
+            return false;
+        }
+
+        $existing = BriefingAttendance::where('guruId', $guru->id)->whereDate('tanggal', $tanggal)->first();
+        if ($existing && $existing->waktu) {
+            return false;
+        }
+
+        $this->simpanScan($guru, $tanggal, $now, $existing);
+
+        return true;
+    }
+
+    /** Writes the briefing row for a real scan, shared by the briefing scan
+     * page and the kiosk absen-masuk scan. */
+    private function simpanScan(Guru $guru, Carbon $tanggal, Carbon $now, ?BriefingAttendance $existing): BriefingAttendance
+    {
         if ($existing) {
             // A manual correction (e.g. ALPA) already exists for today without
             // an actual scan - the real scan now taking place supersedes it.
             $existing->update(['waktu' => $now, 'status' => null, 'catatan' => null]);
-            $record = $existing;
-        } else {
-            $record = BriefingAttendance::create([
-                'guruId' => $guru->id,
-                'tanggal' => $tanggal,
-                'waktu' => $now,
-            ]);
+
+            return $existing;
         }
 
-        return ['nama' => $guru->nama, 'fotoUrl' => $guru->fotoUrl, 'waktu' => $record->waktu];
+        return BriefingAttendance::create([
+            'guruId' => $guru->id,
+            'tanggal' => $tanggal,
+            'waktu' => $now,
+        ]);
     }
 
     /** Admin correction from the briefing rekap table - lets an admin set/fix

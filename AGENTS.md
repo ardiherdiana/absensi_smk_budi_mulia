@@ -1,4 +1,4 @@
-Ini repo Laravel 13 + Inertia + React (TypeScript) untuk sistem absensi guru SMK Budi Mulia Karawang. Repo yang sama memuat dua modul lain: SPPD (surat perintah perjalanan dinas) dan API untuk aplikasi Android SIMAK (`/api/pguru`). Utamakan kebenaran data kehadiran, kesesuaian dengan kode di sekitarnya, dan antarmuka berbahasa Indonesia.
+Ini repo Laravel 13 + Inertia + React (TypeScript) untuk sistem absensi guru SMK Budi Mulia Karawang. Repo yang sama memuat modul SPPD (surat perintah perjalanan dinas). Utamakan kebenaran data kehadiran, kesesuaian dengan kode di sekitarnya, dan antarmuka berbahasa Indonesia.
 
 ## Sebelum menulis kode
 
@@ -25,9 +25,9 @@ Tidak ada pengujian otomatis untuk frontend. Jalankan `npx tsc -b` dan `npm run 
 
 - **Jangan membiarkan dev server menyala.** Verifikasi lewat tes dan build. Bila perlu memeriksa di browser, nyalakan sebentar lalu matikan lagi.
 - **Jangan membaca atau mencetak isi `.env*`.** Bila perlu memeriksa satu nilai, cari kuncinya saja (mis. `grep ^APP_ENV= .env`). Berkas itu berisi kunci Resend, `APP_KEY`, dan sandi basis data.
-- **Basis data dipakai bersama tiga modul dan berisi data nyata.** Jangan menjalankan `migrate:fresh`, `migrate:refresh`, `db:wipe`, atau `db:seed --class=ProductionSyncSeeder` (menghapus isi tabel) tanpa izin eksplisit dari pemilik. `db:seed` biasa memakai sandi bawaan (`admin123`, `guru123`) dan hanya untuk pengembangan.
-- **Skema SPPD dan Pguru ditulis dan dimigrasi dari repo ini.** Folder `../sppd` sudah dihapus; jangan mencari atau memigrasi ke sana.
+- **Basis data dipakai bersama absensi dan SPPD dan berisi data nyata.** Jangan menjalankan `migrate:fresh`, `migrate:refresh`, `db:wipe`, atau `db:seed --class=ProductionSyncSeeder` (menghapus isi tabel) tanpa izin eksplisit dari pemilik. `db:seed` biasa memakai sandi bawaan (`admin123`, `guru123`) dan hanya untuk pengembangan.
+- **Skema SPPD ditulis dan dimigrasi dari repo ini.** Folder `../sppd` sudah dihapus; jangan mencari atau memigrasi ke sana.
 - **Jangan meng-commit** `.env*` selain `.env.example`, dump basis data (`production.sql`, `*.sqlite`), atau paket unggahan (`app.zip` dan arsip lain di akar); semuanya sudah ter-ignore, jangan dipaksa dengan `git add -f`. Commit hanya bila diminta. Folder `md/` dan `laporan/` sengaja tidak masuk git (`/md` dan `/laporan` di `.gitignore`). `.gitignore` bawaan Laravel di `storage/`, `bootstrap/cache/`, dan `database/` dipertahankan apa adanya.
 - **Tampilan**: baca `md/DESIGN_SYSTEM.md`. Warna lewat token, dua tema (terang dan gelap) harus sama-sama terbaca, teks antarmuka berbahasa Indonesia.
 - **Pesan galat** untuk pengguna berbahasa Indonesia, ditulis di tempat kode melempar `abort()` atau validasi, bukan di lapisan lain.
-- **Perubahan di tabel `users`** berdampak ke tiga modul (absensi, SPPD, dan login web). Periksa `md/SECURITY.md` bagian 4 dan `md/ARCHITECTURE.md` bagian 8 sebelum mengubah kolom atau peran.
+- **Perubahan di tabel `users`** berdampak ke absensi, SPPD, dan login web. Periksa `md/SECURITY.md` bagian 4 dan `md/ARCHITECTURE.md` bagian 8 sebelum mengubah kolom atau peran.

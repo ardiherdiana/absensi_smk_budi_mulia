@@ -9,12 +9,14 @@ use App\Models\JadwalHari;
 use App\Models\LeaveRequest;
 use App\Support\Geofence;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\DB;
 
 class AttendanceService
 {
     public function __construct(
         private JadwalService $jadwal,
         private NotificationService $notifications,
+        private BriefingService $briefing,
     ) {}
 
     /** Blocks an action from happening before `hhmm` on `tanggal` - shared by
@@ -39,8 +41,9 @@ class AttendanceService
     /** Shared masuk/pulang state machine behind both check-in paths (QR
      * statis scan di alat sekolah, dan geofenced web check-in) - each path
      * only differs in how it verifies the guru is legitimately present
-     * before calling this. */
-    private function recordAttendance(string $userId): array
+     * before calling this. `$viaKiosk` lets a scan from a guru who already
+     * checked in count as their briefing attendance instead (see below). */
+    private function recordAttendance(string $userId, bool $viaKiosk = false): array
     {
         $guru = Guru::where('userId', $userId)->first();
         if (! $guru) {
@@ -93,6 +96,15 @@ class AttendanceService
         }
 
         if (! $existing->jamPulang) {
+            // Already checked in, scanning at the kiosk again before jam pulang:
+            // while the briefing is in progress and not yet recorded, that scan
+            // is the guru's briefing attendance. From jam pulang on it is always
+            // the pulang scan, even for a briefing with no closing time.
+            $gatePulang = Carbon::parse($tanggal->toDateString().' '.$jadwal->jamPulang);
+            if ($viaKiosk && $now->lt($gatePulang) && $this->briefing->catatDariScanKiosk($guru, $now)) {
+                return ['type' => 'BRIEFING', 'jam' => $now, 'attendance' => $existing, 'nama' => $guru->nama, 'fotoUrl' => $guru->fotoUrl];
+            }
+
             $this->assertWindowOpen(
                 $tanggal,
                 $now,
@@ -108,11 +120,18 @@ class AttendanceService
         abort(409, 'Anda sudah absen masuk dan pulang hari ini');
     }
 
-    /** Scan-station check-in: the school's barcode/QR scanner device reads a
-     * guru's permanent static QR (their `qrToken`) and this resolves it back
-     * to a guru identity - the device itself authenticates as ADMIN, physical
-     * presence at the device is what's actually being verified here, not who
-     * is logged into the browser. */
+    /** Scan-station check-in: the school's kiosk device reads a guru's
+     * permanent static QR (their `qrToken`) through its own camera and this
+     * resolves it back to a guru identity - the device itself authenticates
+     * as ADMIN, physical presence at the device is what's actually being
+     * verified here, not who is logged into the browser.
+     *
+     * While today's briefing is in progress the scan also counts as the
+     * guru's briefing attendance (`briefing` in the result), in the same
+     * transaction: a guru who hasn't checked in yet gets absen masuk and
+     * briefing from one scan (type MASUK); one who already checked in gets
+     * the briefing only (type BRIEFING). The other way to record a briefing
+     * is the admin scanning on the briefing page (BriefingService::checkinBriefing). */
     public function checkinByQrToken(string $qrToken): array
     {
         $guru = Guru::where('qrToken', $qrToken)->first();
@@ -120,7 +139,16 @@ class AttendanceService
             abort(404, 'QR tidak dikenali');
         }
 
-        return $this->recordAttendance($guru->userId);
+        return DB::transaction(function () use ($guru) {
+            $result = $this->recordAttendance($guru->userId, viaKiosk: true);
+            $result['briefing'] = match ($result['type']) {
+                'MASUK' => $this->briefing->catatDariScanKiosk($guru, $result['jam']),
+                'BRIEFING' => true,
+                default => false,
+            };
+
+            return $result;
+        });
     }
 
     /** Web check-in from the guru's own device, gated on being physically at
